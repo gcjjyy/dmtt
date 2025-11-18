@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'IyagiGGC';
+  src: url('https://cdn.jsdelivr.net/gh/JuwanPark/IyagiGGC@latest/IyagiGGC.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+}
+
 @theme {
   /* 폰트 설정 - 한글 지원 */
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", "맑은 고딕",
+  --font-sans: "IyagiGGC", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", "맑은 고딕",
     "Apple SD Gothic Neo", "Noto Sans KR", sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
 
   /* 커스텀 컬러 */
@@ -22,6 +29,13 @@
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+/* 텍스트 스타일 강제 */
+* {
+  font-size: 16px !important;
+  font-weight: normal !important;
+  font-style: normal !important;
 }
 
 html {

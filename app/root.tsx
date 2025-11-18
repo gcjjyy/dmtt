@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   isRouteErrorResponse,
   Links,
@@ -5,10 +6,13 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useNavigate,
+  useLocation,
 } from "react-router";
 
 import type { Route } from "./+types/root";
 import "./app.css";
+import { LanguageProvider } from "./contexts/LanguageContext";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -42,7 +46,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <Outlet />;
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Skip check on welcome page
+    if (location.pathname === "/welcome") {
+      return;
+    }
+
+    // Check if username exists in localStorage
+    const username = localStorage.getItem("typing-practice-username");
+
+    // If no username, redirect to welcome
+    if (!username) {
+      navigate("/welcome", { replace: true });
+    }
+  }, [location.pathname, navigate]);
+
+  return (
+    <LanguageProvider>
+      <Outlet />
+    </LanguageProvider>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
