@@ -50,7 +50,7 @@ export default function VeniceGame() {
   const [level, setLevel] = useState(1);
   const [fallingWords, setFallingWords] = useState<FallingWord[]>([]);
   const [inputValue, setInputValue] = useState("");
-  const [nextWordId, setNextWordId] = useState(0);
+  const nextWordIdRef = useRef(0);
   const [mines, setMines] = useState<Mine[]>([]);
   const [isFrozen, setIsFrozen] = useState(false);
   const [speedMultiplier, setSpeedMultiplier] = useState(1);
@@ -75,18 +75,16 @@ export default function VeniceGame() {
         spawnNewWord();
       }, Math.max(1000, WORD_SPAWN_INTERVAL - level * 100));
 
-      // Animation loop
-      const animate = () => {
+      // Step animation - speed increases with level
+      // Level 1: 1초, Level 8: 0.5초
+      const stepDelay = Math.max(500, 1000 - (level - 1) * (500 / 7));
+      const stepInterval = setInterval(() => {
         updateWordPositions();
-        animationRef.current = requestAnimationFrame(animate);
-      };
-      animationRef.current = requestAnimationFrame(animate);
+      }, stepDelay);
 
       return () => {
         clearInterval(spawnInterval);
-        if (animationRef.current) {
-          cancelAnimationFrame(animationRef.current);
-        }
+        clearInterval(stepInterval);
       };
     }
   }, [gameStarted, gameOver, level]);
@@ -96,7 +94,7 @@ export default function VeniceGame() {
     const isVirus = Math.random() < 0.15; // 15% 확률로 바이러스
 
     const newWord: FallingWord = {
-      id: nextWordId,
+      id: nextWordIdRef.current,
       word: randomWord,
       x: Math.random() * (GAME_WIDTH - 100),
       y: -50,
@@ -104,7 +102,7 @@ export default function VeniceGame() {
       isVirus,
     };
 
-    setNextWordId((prev) => prev + 1);
+    nextWordIdRef.current += 1;
     setFallingWords((prev) => [...prev, newWord]);
   };
 
@@ -179,14 +177,14 @@ export default function VeniceGame() {
         for (let i = 0; i < 10; i++) {
           const randomWord = words[Math.floor(Math.random() * words.length)];
           newWords.push({
-            id: nextWordId + i,
+            id: nextWordIdRef.current + i,
             word: randomWord,
             x: Math.random() * (GAME_WIDTH - 100),
             y: -50 - i * 30,
             speed: (BASE_SPEED + level * 0.2) * speedMultiplier,
           });
         }
-        setNextWordId((prev) => prev + 10);
+        nextWordIdRef.current += 10;
         setFallingWords((prev) => [...prev, ...newWords]);
         break;
 
@@ -210,7 +208,7 @@ export default function VeniceGame() {
     setFallingWords((prev) => {
       let updated = prev.map((word) => ({
         ...word,
-        y: word.y + word.speed,
+        y: word.y + 16, // 1초에 16px씩 이동
       }));
 
       // 지뢰와 충돌 체크
@@ -261,25 +259,41 @@ export default function VeniceGame() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setInputValue(value);
+    // 스페이스바가 아닌 일반 입력만 처리
+    if (!value.endsWith(" ")) {
+      setInputValue(value);
+    }
+  };
 
-    // Check if any word matches
-    const matchedWord = fallingWords.find((w) => w.word === value);
-    if (matchedWord) {
-      // Remove the matched word
-      setFallingWords((prev) => prev.filter((w) => w.id !== matchedWord.id));
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // 스페이스바로 단어 제출
+    if (e.key === " " || e.code === "Space") {
+      e.preventDefault();
 
-      // 바이러스 단어인 경우 효과 발동
-      if (matchedWord.isVirus) {
-        triggerVirusEffect(matchedWord.x, matchedWord.y);
-      }
+      const value = inputValue.trim();
+      if (!value) return;
 
-      setScore((prev) => prev + matchedWord.word.length * 10);
-      setInputValue("");
+      // Check if any word matches
+      const matchedWord = fallingWords.find((w) => w.word === value);
+      if (matchedWord) {
+        // Remove the matched word
+        setFallingWords((prev) => prev.filter((w) => w.id !== matchedWord.id));
 
-      // Level up every 500 points
-      if ((score + matchedWord.word.length * 10) % 500 === 0) {
-        setLevel((prev) => prev + 1);
+        // 바이러스 단어인 경우 효과 발동
+        if (matchedWord.isVirus) {
+          triggerVirusEffect(matchedWord.x, matchedWord.y);
+        }
+
+        setScore((prev) => prev + matchedWord.word.length * 10);
+        setInputValue("");
+
+        // Level up every 500 points
+        if ((score + matchedWord.word.length * 10) % 500 === 0) {
+          setLevel((prev) => prev + 1);
+        }
+      } else {
+        // 틀렸을 경우 입력 초기화
+        setInputValue("");
       }
     }
   };
@@ -292,7 +306,7 @@ export default function VeniceGame() {
     setLevel(1);
     setFallingWords([]);
     setInputValue("");
-    setNextWordId(0);
+    nextWordIdRef.current = 0;
     setMines([]);
     setIsFrozen(false);
     setSpeedMultiplier(1);
@@ -456,17 +470,17 @@ export default function VeniceGame() {
         {/* Game Area */}
         <div
           ref={gameAreaRef}
-          className="relative bg-gradient-to-b from-blue-100 to-blue-50 dark:from-gray-800 dark:to-gray-700 rounded-2xl shadow-2xl overflow-hidden"
+          className="relative bg-gradient-to-b from-teal-500 to-teal-600 dark:from-teal-700 dark:to-teal-800 rounded-2xl shadow-2xl overflow-hidden"
           style={{ width: GAME_WIDTH, height: GAME_HEIGHT, margin: "0 auto" }}
         >
           {/* Falling Words */}
           {fallingWords.map((word) => (
             <div
               key={word.id}
-              className={`absolute px-4 py-2 rounded-lg shadow-lg border-2 ${
+              className={`absolute ${
                 word.isVirus
-                  ? "bg-yellow-300 dark:bg-yellow-600 text-gray-900 border-yellow-500"
-                  : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-purple-500"
+                  ? "text-yellow-400 dark:text-yellow-300"
+                  : "text-gray-900 dark:text-white"
               }`}
               style={{
                 left: word.x,
@@ -530,8 +544,10 @@ export default function VeniceGame() {
             type="text"
             value={inputValue}
             onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onPaste={(e) => e.preventDefault()}
             className="w-full p-4 border-4 border-purple-500 rounded-lg focus:border-purple-600 focus:outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-center"
-            placeholder={t("단어를 입력하세요...", "Type words here...")}
+            placeholder={t("단어를 입력하고 스페이스바를 누르세요...", "Type words and press spacebar...")}
             autoComplete="off"
             spellCheck={false}
           />

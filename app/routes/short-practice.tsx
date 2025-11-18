@@ -288,6 +288,7 @@ export default function ShortPractice() {
             value={typedText}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
+            onPaste={(e) => e.preventDefault()}
             className="w-full p-4 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:border-blue-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             placeholder={t("여기에 입력하세요...", "Type here...")}
             autoComplete="off"

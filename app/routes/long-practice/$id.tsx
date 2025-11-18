@@ -411,6 +411,7 @@ export default function LongPracticeTyping() {
                   value={typedText}
                   onChange={handleInputChange}
                   onKeyDown={handleKeyDown}
+                  onPaste={(e) => e.preventDefault()}
                   className="w-full h-4 border-0 focus:outline-none bg-transparent text-gray-900 dark:text-white"
                   placeholder={t("여기에 입력하세요...", "Type here...")}
                   autoComplete="off"
