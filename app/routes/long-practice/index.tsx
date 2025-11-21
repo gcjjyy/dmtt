@@ -2,6 +2,7 @@ import { Link, useLoaderData } from "react-router";
 import type { Route } from "./+types/index";
 import { useLanguage } from "~/contexts/LanguageContext";
 import { getLongTextList } from "~/lib/data-loader.server";
+import { DosWindowAlt } from "~/components/DosWindowAlt";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
@@ -17,40 +18,20 @@ export default function LongPracticeIndex() {
   const { t } = useLanguage();
 
   return (
-    <div className="w-full h-full bg-[#008080] p-4">
-      <div className="w-full">
-        <div className="flex justify-between items-center mb-8">
-          <Link
-            to="/"
-            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-          >
-            ← {t("돌아가기", "Back")}
-          </Link>
-          <h1 className="text-gray-900 dark:text-white">
-            {t("장문 연습", "Long Text Practice")}
-          </h1>
-          <div className="w-20"></div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {textList.map((text) => (
+    <div className="w-full h-full bg-[#008080] flex items-center justify-center p-4">
+      <DosWindowAlt title={t("장문 연습", "Long Text Practice")} className="mx-auto max-h-[400px]">
+        <div className="flex flex-col overflow-y-auto">
+          {textList.map((text, index) => (
             <Link
               key={text.id}
               to={`/long-practice/${text.id}?lang=${language}`}
-              className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 border-2 border-transparent hover:border-blue-500"
+              className="px-3 text-black hover:bg-black hover:text-white cursor-pointer"
             >
-              <div className="flex items-center gap-4">
-                <div>📖</div>
-                <div>
-                  <h2 className="text-gray-900 dark:text-white">
-                    {text.title}
-                  </h2>
-                </div>
-              </div>
+              {index + 1}. {text.title}
             </Link>
           ))}
         </div>
-      </div>
+      </DosWindowAlt>
     </div>
   );
 }

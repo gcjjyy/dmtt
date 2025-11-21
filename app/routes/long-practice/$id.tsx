@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Link, useLoaderData, redirect } from "react-router";
+import { Link, useLoaderData, redirect, useNavigate } from "react-router";
 import type { Route } from "./+types/$id";
 import { useLanguage } from "~/contexts/LanguageContext";
 import { loadLongText } from "~/lib/data-loader.server";
@@ -25,8 +25,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export default function LongPracticeTyping() {
-  const { textData, language } = useLoaderData<typeof loader>();
+  const { textData } = useLoaderData<typeof loader>();
   const { t } = useLanguage();
+  const navigate = useNavigate();
 
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [typedText, setTypedText] = useState("");
@@ -66,7 +67,7 @@ export default function LongPracticeTyping() {
 
   // Pagination state and calculations
   const [currentPage, setCurrentPage] = useState(0);
-  const CONTAINER_HEIGHT = 600; // max-h-[600px]
+  const CONTAINER_HEIGHT = 288; // h-72 = 288px, shows 6 lines
   const LINE_HEIGHT = 48; // 16px text + 16px typed + 16px margin
   const linesPerPage = Math.floor(CONTAINER_HEIGHT / LINE_HEIGHT);
   const totalPages = Math.ceil(targetLines.length / linesPerPage);
@@ -152,6 +153,13 @@ export default function LongPracticeTyping() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // ESC를 누르면 홈으로
+    if (e.key === "Escape") {
+      e.preventDefault();
+      navigate("/");
+      return;
+    }
+
     // 엔터를 누르면 다음 줄로 (입력한 내용이 있을 때만)
     if (e.key === "Enter" && typedText.length > 0) {
       e.preventDefault();
@@ -242,24 +250,25 @@ export default function LongPracticeTyping() {
   const typedChars = allTypedLines.join("").length + typedText.length;
   const progress = (typedChars / totalChars) * 100;
 
+  const handleContainerClick = () => {
+    inputRef.current?.focus();
+  };
+
   const renderLine = (line: string, lineIndex: number) => {
-    const isCurrentLine = lineIndex === currentLineIndex;
     const isPastLine = lineIndex < currentLineIndex;
     const typedForThisLine = isPastLine ? allTypedLines[lineIndex] || "" : "";
 
     return (
       <div key={lineIndex} data-line={lineIndex} className="mb-4">
         {/* 원문 */}
-        <div className="leading-4 mb-0 text-gray-400 dark:text-gray-600">
+        <div className="leading-4 mb-0 text-black">
           {line}
         </div>
         {/* 입력한 텍스트 (항상 표시, 이전 줄들만 내용 있음) */}
-        <div className="leading-4 mb-0 h-4">
+        <div className="leading-4 mb-0 h-4 flex items-center">
           {isPastLine && typedForThisLine.split("").map((char, charIndex) => {
             const isCorrect = line[charIndex] === char;
-            const className = isCorrect
-              ? "text-gray-900 dark:text-gray-100"
-              : "text-red-600 dark:text-red-400";
+            const className = isCorrect ? "text-black" : "text-red-600";
 
             return (
               <span key={charIndex} className={className}>
@@ -276,73 +285,64 @@ export default function LongPracticeTyping() {
     const grade = getTypingGrade(stats.accuracy, stats.cpm);
 
     return (
-      <div className="p-8">
-        <div className="w-full">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-xl">
-            <h1 className="text-center mb-4 text-gray-900 dark:text-white">
+      <div className="w-full h-full bg-[#008080] flex items-center justify-center p-4">
+        {/* DOS Result Window */}
+        <div className="w-[640px] bg-[#C0C0C0] border border-black flex flex-col">
+          {/* Raised 3D effect */}
+          <div className="w-full border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] flex flex-col">
+            {/* Title */}
+            <div className="text-[#0000AA] py-0.5 flex items-center justify-center">
               {t("연습 완료!", "Practice Complete!")}
-            </h1>
-            <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
-              {textData.title}
-            </p>
-
-            <div className="text-center mb-8">
-              <div className="text-blue-600 dark:text-blue-400 mb-4">
-                {grade}
-              </div>
-              <div className="text-gray-600 dark:text-gray-400">
-                {t("등급", "Grade")}
-              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-8">
-              <div className="bg-blue-50 dark:bg-gray-700 p-4 rounded-lg">
-                <div className="text-gray-600 dark:text-gray-400">
-                  {t("정확도", "Accuracy")}
-                </div>
-                <div className="text-gray-900 dark:text-white">
-                  {stats.accuracy}%
-                </div>
+            {/* Inner Sunken Box */}
+            <div className="mx-1.5 mb-1.5 border border-t-[#808080] border-l-[#808080] border-b-white border-r-white bg-[#C0C0C0] p-6">
+              {/* Text Title */}
+              <div className="text-center text-black mb-6">
+                {textData.title}
               </div>
-              <div className="bg-blue-50 dark:bg-gray-700 p-4 rounded-lg">
-                <div className="text-gray-600 dark:text-gray-400">
-                  {t("타수", "CPM")}
-                </div>
-                <div className="text-gray-900 dark:text-white">
-                  {stats.cpm}
-                </div>
-              </div>
-              <div className="bg-blue-50 dark:bg-gray-700 p-4 rounded-lg">
-                <div className="text-gray-600 dark:text-gray-400">
-                  {t("소요 시간", "Time")}
-                </div>
-                <div className="text-gray-900 dark:text-white">
-                  {formatTime(stats.timeElapsed)}
-                </div>
-              </div>
-              <div className="bg-blue-50 dark:bg-gray-700 p-4 rounded-lg">
-                <div className="text-gray-600 dark:text-gray-400">
-                  {t("점수", "Score")}
-                </div>
-                <div className="text-gray-900 dark:text-white">
-                  {stats.score.toLocaleString()}
-                </div>
-              </div>
-            </div>
 
-            <div className="flex gap-4">
-              <Link
-                to="/long-practice"
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg text-center"
-              >
-                {t("다른 글 선택", "Choose Another")}
-              </Link>
-              <Link
-                to="/"
-                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 px-6 rounded-lg text-center"
-              >
-                {t("메인으로", "Home")}
-              </Link>
+              {/* Grade */}
+              <div className="text-center mb-6">
+                <div className="text-4xl text-[#0000AA] mb-2">{grade}</div>
+                <div className="text-black">{t("등급", "Grade")}</div>
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="border-2 border-t-[#808080] border-l-[#808080] border-b-white border-r-white p-3 bg-[#C0C0C0]">
+                  <div className="text-black text-sm">{t("정확도", "Accuracy")}</div>
+                  <div className="text-black text-xl">{stats.accuracy}%</div>
+                </div>
+                <div className="border-2 border-t-[#808080] border-l-[#808080] border-b-white border-r-white p-3 bg-[#C0C0C0]">
+                  <div className="text-black text-sm">{t("타수", "CPM")}</div>
+                  <div className="text-black text-xl">{stats.cpm}</div>
+                </div>
+                <div className="border-2 border-t-[#808080] border-l-[#808080] border-b-white border-r-white p-3 bg-[#C0C0C0]">
+                  <div className="text-black text-sm">{t("소요 시간", "Time")}</div>
+                  <div className="text-black text-xl">{formatTime(stats.timeElapsed)}</div>
+                </div>
+                <div className="border-2 border-t-[#808080] border-l-[#808080] border-b-white border-r-white p-3 bg-[#C0C0C0]">
+                  <div className="text-black text-sm">{t("점수", "Score")}</div>
+                  <div className="text-black text-xl">{stats.score.toLocaleString()}</div>
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-4">
+                <Link
+                  to="/long-practice"
+                  className="flex-1 text-center text-black border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-[#C0C0C0] hover:bg-[#D0D0D0] py-2"
+                >
+                  {t("다른 글 선택", "Choose Another")}
+                </Link>
+                <Link
+                  to="/"
+                  className="flex-1 text-center text-black border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-[#C0C0C0] hover:bg-[#D0D0D0] py-2"
+                >
+                  {t("메인으로", "Home")}
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -351,99 +351,134 @@ export default function LongPracticeTyping() {
   }
 
   return (
-    <div className="w-full h-full bg-[#008080] p-4">
-      <div className="w-full">
-        <div className="flex justify-between items-center mb-6">
-          <Link
-            to="/long-practice"
-            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-          >
-            ← {t("돌아가기", "Back")}
-          </Link>
-          <h1 className="text-gray-900 dark:text-white">
+    <div className="w-full h-full bg-[#008080] flex items-center justify-center p-4">
+      {/* DOS Window */}
+      <div
+        className="w-[800px] h-[480px] bg-[#C0C0C0] border border-black flex flex-col"
+        onClick={handleContainerClick}
+      >
+        {/* Raised 3D effect */}
+        <div className="w-full h-full border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] flex flex-col">
+          {/* Title */}
+          <div className="text-[#0000AA] py-0.5 flex items-center justify-center">
             {textData.title}
-          </h1>
-          <div className="flex gap-6 items-center">
-            <div className="text-center">
-              <div className="text-gray-600 dark:text-gray-400">
-                {t("타수", "CPM")}
-              </div>
-              <div className="text-blue-600 dark:text-blue-400">
-                {currentCPM}
+          </div>
+
+          {/* Inner Sunken Box */}
+          <div className="flex-1 mx-1.5 mb-1.5 border border-t-[#808080] border-l-[#808080] border-b-white border-r-white bg-[#C0C0C0] flex flex-col">
+            {/* Text Area */}
+            <div className="flex-1 px-6 py-4 overflow-hidden">
+              <div ref={displayRef} className="h-72">
+                {/* 이전 줄들 (현재 페이지 내) */}
+                {targetLines
+                  .slice(pageStartLine, currentLineIndex)
+                  .map((line, idx) => renderLine(line, pageStartLine + idx))}
+
+                {/* 현재 줄 */}
+                <div className="mb-4" data-line={currentLineIndex}>
+                  <div className="leading-4 mb-0 text-black">
+                    {currentLine}
+                  </div>
+                  {/* 입력 표시 */}
+                  <div className="leading-4 mb-0 h-4 flex items-center">
+                    {typedText.split("").map((char, i) => {
+                      const isCorrect = char === currentLine[i];
+                      return (
+                        <span key={i} className={isCorrect ? "text-black" : "text-red-600"}>
+                          {char === " " ? "\u00A0" : char}
+                        </span>
+                      );
+                    })}
+                    <span className="inline-block w-2 h-5 bg-[#808080] animate-pulse"></span>
+                  </div>
+                </div>
+
+                {/* 다음 줄들 (현재 페이지 내) */}
+                {targetLines
+                  .slice(currentLineIndex + 1, pageEndLine)
+                  .map((line, idx) => renderLine(line, currentLineIndex + 1 + idx))}
               </div>
             </div>
-            <div className="text-center">
-              <div className="text-gray-600 dark:text-gray-400">
-                {t("시간", "Time")}
+
+            {/* Stats Panel */}
+            <div className="mx-4 mb-4 border border-[#808080]">
+              {/* Top Row - Headers */}
+              <div className="flex border-t border-l border-[#EFEFEF]">
+                <div className="flex-[3] text-center py-0.5 text-black">
+                  {t("속도(타수/분)", "Speed(CPM)")}
+                </div>
+                <div className="flex-1 text-center py-0.5 text-black">
+                  {t("진행률", "Progress")}
+                </div>
+                <div className="flex-1 text-center py-0.5 text-black">
+                  {t("시간", "Time")}
+                </div>
+                <div className="flex-1 text-center py-0.5 text-black">
+                  {t("페이지", "Page")}
+                </div>
               </div>
-              <div className="text-gray-700 dark:text-gray-300">
-                {formatTime(elapsedTime)}
+
+              {/* Bottom Row - Gauges */}
+              <div className="h-px bg-[#808080]"></div>
+              <div className="flex border-t border-l border-[#EFEFEF]">
+                {/* Speed gauge */}
+                <div className="flex-[3] grid grid-cols-4 gap-y-0 px-2 pt-4 pb-4">
+                  {/* Row 1: Empty + Scale */}
+                  <div></div>
+                  <div className="col-span-3 flex items-end justify-between pl-4">
+                    {[...Array(13)].map((_, i) => (
+                      <div key={i} className={`w-px bg-black ${i % 2 === 0 ? 'h-3' : 'h-1.5'}`}></div>
+                    ))}
+                  </div>
+
+                  {/* Row 2: 현재 속도 + Gauge */}
+                  <div className="text-black text-right pr-2 whitespace-nowrap flex items-center justify-end">
+                    {t("현재 속도", "Current")}
+                  </div>
+                  <div className="col-span-3 flex items-center">
+                    <div className="w-full h-4 bg-white border border-black relative">
+                      <div
+                        className="absolute top-0 left-0 h-full bg-[#0000AA]"
+                        style={{ width: `calc(${(1 - Math.min(currentCPM / 700, 1)) * 16}px + ${Math.min(currentCPM / 700, 1) * 100}%)` }}
+                      ></div>
+                      <span className="absolute left-0.5 top-0 h-full flex items-center text-white z-10">
+                        {currentCPM}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Progress */}
+                <div className="flex-1 flex items-center justify-center text-black">
+                  {progress.toFixed(1)}%
+                </div>
+
+                {/* Time */}
+                <div className="flex-1 flex items-center justify-center text-black">
+                  {formatTime(elapsedTime)}
+                </div>
+
+                {/* Page */}
+                <div className="flex-1 flex items-center justify-center text-black">
+                  {currentPage + 1}/{totalPages}
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Progress bar */}
-        <div className="mb-6 bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
-          <div
-            className="bg-blue-600 h-full transition-all duration-300"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-xl">
-          <div ref={displayRef} className="h-[600px]">
-            {/* 이전 줄들 (현재 페이지 내) */}
-            {targetLines
-              .slice(pageStartLine, currentLineIndex)
-              .map((line, idx) => renderLine(line, pageStartLine + idx))}
-
-            {/* 현재 줄 */}
-            <div className="mb-4" data-line={currentLineIndex}>
-              <div className="leading-4 mb-0 text-gray-400 dark:text-gray-600">
-                {currentLine}
-              </div>
-              {/* 입력창 */}
-              <div className="leading-4 mb-0">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={typedText}
-                  onChange={handleInputChange}
-                  onKeyDown={handleKeyDown}
-                  onPaste={(e) => e.preventDefault()}
-                  className="w-full h-4 border-0 focus:outline-none bg-transparent text-gray-900 dark:text-white"
-                  placeholder={t("여기에 입력하세요...", "Type here...")}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-              </div>
-            </div>
-
-            {/* 다음 줄들 (현재 페이지 내) */}
-            {targetLines
-              .slice(currentLineIndex + 1, pageEndLine)
-              .map((line, idx) => renderLine(line, currentLineIndex + 1 + idx))}
-          </div>
-
-          <div className="mt-6 flex justify-between items-center border-t border-gray-200 dark:border-gray-700 pt-4">
-            <div className="text-gray-600 dark:text-gray-400">
-              {t("줄", "Line")} {currentLineIndex + 1} / {targetLines.length}
-              {" · "}
-              {t("페이지", "Page")} {currentPage + 1} / {totalPages}
-              {" · "}
-              {typedChars} / {totalChars} {t("글자", "chars")} ({progress.toFixed(1)}%)
-            </div>
-            <button
-              onClick={() => handleNextLine()}
-              className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-lg"
-            >
-              {currentLineIndex === targetLines.length - 1
-                ? t("완료", "Finish")
-                : t("건너뛰기", "Skip")}
-            </button>
-          </div>
-        </div>
+        {/* Hidden Input */}
+        <input
+          ref={inputRef}
+          type="text"
+          value={typedText}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          onPaste={(e) => e.preventDefault()}
+          className="absolute opacity-0 pointer-events-none"
+          autoComplete="off"
+          spellCheck={false}
+        />
       </div>
     </div>
   );

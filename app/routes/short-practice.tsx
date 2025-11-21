@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { useLoaderData } from "react-router";
+import { useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/short-practice";
 import { useLanguage } from "~/contexts/LanguageContext";
 import { loadProverbs } from "~/lib/data-loader.server";
-import { calculateTypingStats } from "~/lib/typing-engine";
+import { calculateTypingStats, calculateCorrectKeystrokes } from "~/lib/typing-engine";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
@@ -15,6 +15,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 export default function ShortPractice() {
   const { proverbs } = useLoaderData<typeof loader>();
   const { t } = useLanguage();
+  const navigate = useNavigate();
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [typedText, setTypedText] = useState("");
@@ -26,6 +27,11 @@ export default function ShortPractice() {
   const [shuffledProverbs, setShuffledProverbs] = useState<string[]>([]);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const typedTextRef = useRef(typedText);
+
+  useEffect(() => {
+    typedTextRef.current = typedText;
+  }, [typedText]);
 
   useEffect(() => {
     const shuffled = [...proverbs].sort(() => Math.random() - 0.5);
@@ -46,10 +52,43 @@ export default function ShortPractice() {
 
   const currentProverb = shuffledProverbs[currentIndex % shuffledProverbs.length] || "";
 
-  
+  // 실시간 CPM 업데이트
+  useEffect(() => {
+    if (!sentenceStartTime) return;
+
+    const interval = setInterval(() => {
+      const elapsed = (Date.now() - sentenceStartTime) / 1000;
+      const typed = typedTextRef.current;
+
+      if (typed.length > 0) {
+        const { correct: correctKeystrokes, total: totalKeystrokes } = calculateCorrectKeystrokes(currentProverb, typed);
+        const cpm = elapsed > 0 ? Math.round((correctKeystrokes / elapsed) * 60) : 0;
+        setCurrentCPM(cpm);
+        setCurrentAccuracy(totalKeystrokes > 0 ? Math.round((correctKeystrokes / totalKeystrokes) * 100) : 0);
+      } else {
+        setCurrentCPM(0);
+        setCurrentAccuracy(0);
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [sentenceStartTime, currentProverb]);
+
   useEffect(() => {
     inputRef.current?.focus();
   }, [currentIndex]);
+
+  // ESC key handler to go home
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        navigate("/");
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [navigate]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -176,6 +215,7 @@ export default function ShortPractice() {
               </div>
 
               {/* Bottom Row - Gauges */}
+              <div className="h-px bg-[#808080]"></div>
               <div className="flex border-t border-l border-[#EFEFEF]">
                 {/* Left 3 columns - Speed gauges (4x3 grid) */}
                 <div className="flex-[3] grid grid-cols-4 gap-y-0 px-2 pt-4 pb-4">
