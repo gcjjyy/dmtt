@@ -441,7 +441,7 @@ export default function VeniceGame() {
   }
 
   return (
-    <div className="p-8">
+    <div className="w-full h-full bg-[#008080] p-4">
       <div className="w-full">
         {/* Stats */}
         <div className="flex justify-between items-center mb-6">

@@ -108,14 +108,14 @@ export default function MainLayout() {
     <div className="min-h-screen bg-[#C0C0C0] flex items-center justify-center m-0 p-0">
       <div className="w-[800px] h-[600px] flex flex-col m-0 outline outline-1 outline-black">
         {/* Title Bar */}
-        <div className="bg-[#0000AA] border-t border-l border-t-white border-l-white border-b border-r border-b-black border-r-black h-6 px-1 text-white flex justify-center items-center">
+        <div className="bg-[#0000AA] border-t border-l border-b border-t-white border-l-white border-b-black h-6 px-1 text-white flex justify-center items-center">
           도·박 타 자 교 사
         </div>
 
         {/* Menu Bar */}
         <div
           ref={menuBarRef}
-          className="bg-white h-5 flex relative border-b border-black pl-2"
+          className="bg-white h-5 flex relative border-b border-black pl-2 z-10"
         >
           {menuItems.map((menu) => (
             <div key={menu.key} className="relative">
@@ -149,7 +149,7 @@ export default function MainLayout() {
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 w-full overflow-auto">
+        <div className="flex-1 w-full overflow-visible">
           <Outlet />
         </div>
 

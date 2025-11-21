@@ -111,7 +111,7 @@ export default function LongPracticeTyping() {
       const idx = currentLineIndexRef.current;
       const allOriginalText = targetLines.slice(0, idx + 1).join("\n");
       const allTypedText = allTypedLinesRef.current.join("\n") + (allTypedLinesRef.current.length > 0 ? "\n" : "") + typedTextRef.current;
-      const correctKeystrokes = calculateCorrectKeystrokes(allOriginalText, allTypedText);
+      const { correct: correctKeystrokes } = calculateCorrectKeystrokes(allOriginalText, allTypedText);
 
       const cpm = timeElapsed > 0 ? (correctKeystrokes / timeElapsed) * 60 : 0;
       setCurrentCPM(Math.round(cpm));
@@ -351,7 +351,7 @@ export default function LongPracticeTyping() {
   }
 
   return (
-    <div className="p-8">
+    <div className="w-full h-full bg-[#008080] p-4">
       <div className="w-full">
         <div className="flex justify-between items-center mb-6">
           <Link

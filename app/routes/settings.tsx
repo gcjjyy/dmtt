@@ -60,7 +60,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="p-8">
+    <div className="w-full h-full bg-[#008080] p-4">
       <div className="w-full">
         {/* Confirmation Dialog */}
         {showConfirmDialog && (

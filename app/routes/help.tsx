@@ -5,7 +5,7 @@ export default function Help() {
   const { t } = useLanguage();
 
   return (
-    <div className="p-8">
+    <div className="w-full h-full bg-[#008080] p-4">
       <div className="w-full">
         <div className="flex justify-between items-center mb-8">
           <Link

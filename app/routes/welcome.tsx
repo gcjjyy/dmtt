@@ -39,7 +39,7 @@ export default function Welcome() {
   };
 
   return (
-    <div className="p-8">
+    <div className="w-full h-full bg-[#008080] p-4">
       <div className="flex justify-center pt-20">
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-xl w-[28rem]">
           <div className="text-center mb-8">

@@ -36,54 +36,56 @@ function decomposeKorean(char: string): { cho: number; jung: number; jong: numbe
 }
 
 /**
- * 두 글자를 비교하여 맞은 타수 반환
+ * 한글 글자의 타수 계산 (초성 + 중성 + 종성)
  */
-function compareChars(original: string, typed: string): number {
+export function getKoreanKeystrokes(char: string): number {
+  const decomposed = decomposeKorean(char);
+  if (!decomposed) return 1; // 한글이 아니면 1타
+
+  // 종성이 있으면 3타, 없으면 2타
+  return decomposed.jong > 0 ? 3 : 2;
+}
+
+/**
+ * 두 글자를 비교하여 맞은 타수 반환
+ * - 한글: 초성/중성/종성 각각 비교하여 맞은 만큼 타수 부여
+ * - 기타: 일치하면 1타
+ */
+function compareChars(original: string, typed: string): { correct: number; total: number } {
   // 줄바꿈은 타수에서 제외
   if (original === '\n' || typed === '\n') {
-    return 0;
+    return { correct: 0, total: 0 };
   }
 
-  // 완전히 일치하면
-  if (original === typed) {
-    // 한글인지 확인
-    const decomposed = decomposeKorean(original);
-    if (decomposed) {
-      // 한글: 초성(1) + 중성(1) + 종성(0 or 1)
-      return decomposed.jong > 0 ? 3 : 2;
-    } else {
-      // 영어 또는 기타: 1타
-      return 1;
-    }
-  }
-
-  // 한글 부분 일치 확인
   const originalDecomposed = decomposeKorean(original);
   const typedDecomposed = decomposeKorean(typed);
 
+  // 둘 다 한글인 경우
   if (originalDecomposed && typedDecomposed) {
-    let correctKeystrokes = 0;
+    let correct = 0;
+    let total = 0;
 
-    // 초성 비교
-    if (originalDecomposed.cho === typedDecomposed.cho) {
-      correctKeystrokes += 1;
+    // 초성 비교 (1타)
+    total += 1;
+    if (originalDecomposed.cho === typedDecomposed.cho) correct += 1;
+
+    // 중성 비교 (1타)
+    total += 1;
+    if (originalDecomposed.jung === typedDecomposed.jung) correct += 1;
+
+    // 종성 비교 (있는 경우만)
+    if (originalDecomposed.jong > 0) {
+      total += 1;
+      if (originalDecomposed.jong === typedDecomposed.jong) correct += 1;
     }
 
-    // 중성 비교
-    if (originalDecomposed.jung === typedDecomposed.jung) {
-      correctKeystrokes += 1;
-    }
-
-    // 종성 비교 (종성이 있을 때만)
-    if (originalDecomposed.jong > 0 && originalDecomposed.jong === typedDecomposed.jong) {
-      correctKeystrokes += 1;
-    }
-
-    return correctKeystrokes;
+    return { correct, total };
   }
 
-  // 일치하지 않으면 0타
-  return 0;
+  // 한글이 아닌 경우 (영문, 숫자, 특수문자 등)
+  const total = 1;
+  const correct = original === typed ? 1 : 0;
+  return { correct, total };
 }
 
 /**
@@ -125,8 +127,9 @@ export function calculateScore(accuracy: number, cpm: number): number {
 /**
  * Calculate correct keystrokes between original and typed text
  */
-export function calculateCorrectKeystrokes(originalText: string, typedText: string): number {
+export function calculateCorrectKeystrokes(originalText: string, typedText: string): { correct: number; total: number } {
   let totalCorrectKeystrokes = 0;
+  let totalPossibleKeystrokes = 0;
 
   const maxLength = Math.max(originalText.length, typedText.length);
 
@@ -134,17 +137,22 @@ export function calculateCorrectKeystrokes(originalText: string, typedText: stri
     const originalChar = originalText[i] || '';
     const typedChar = typedText[i] || '';
 
-    // Count actual correct keystrokes
+    if (originalChar && originalChar !== '\n') {
+      totalPossibleKeystrokes += getKoreanKeystrokes(originalChar);
+    }
+
     if (typedChar) {
-      totalCorrectKeystrokes += compareChars(originalChar, typedChar);
+      const result = compareChars(originalChar, typedChar);
+      totalCorrectKeystrokes += result.correct;
     }
   }
 
-  return totalCorrectKeystrokes;
+  return { correct: totalCorrectKeystrokes, total: totalPossibleKeystrokes };
 }
 
 /**
  * Calculate all typing statistics
+ * kimtaja 방식: 맞은 타수만 CPM에 반영
  */
 export function calculateTypingStats(
   originalText: string,
@@ -155,27 +163,25 @@ export function calculateTypingStats(
   let totalCorrectKeystrokes = 0;
   let totalPossibleKeystrokes = 0;
 
-  // Calculate keystrokes (not just characters)
+  // Calculate keystrokes (한글: 초성/중성/종성, 기타: 1타)
   const maxLength = Math.max(originalText.length, typedText.length);
 
   for (let i = 0; i < maxLength; i++) {
     const originalChar = originalText[i] || '';
     const typedChar = typedText[i] || '';
 
-    if (originalChar) {
-      // Count possible keystrokes for this position
-      const decomposed = decomposeKorean(originalChar);
-      totalPossibleKeystrokes += decomposed ? (decomposed.jong > 0 ? 3 : 2) : 1;
+    if (originalChar && originalChar !== '\n') {
+      totalPossibleKeystrokes += getKoreanKeystrokes(originalChar);
     }
 
-    // Count actual correct keystrokes
-    if (typedChar) {
-      totalCorrectKeystrokes += compareChars(originalChar, typedChar);
+    if (typedChar && typedChar !== '\n') {
+      const result = compareChars(originalChar, typedChar);
+      totalCorrectKeystrokes += result.correct;
     }
   }
 
-  const totalChars = typedText.length;
   const accuracy = calculateAccuracy(totalCorrectKeystrokes, totalPossibleKeystrokes);
+  // CPM은 맞은 타수 기준으로 계산 (kimtaja 방식)
   const cpm = calculateCPM(totalCorrectKeystrokes, timeInSeconds);
   const wpm = calculateWPM(totalCorrectKeystrokes, timeInSeconds);
 
@@ -183,12 +189,12 @@ export function calculateTypingStats(
   const score = (mode === "short" || mode === "long") ? Math.round(cpm) : calculateScore(accuracy, cpm);
 
   return {
-    totalChars,
+    totalChars: typedText.length,
     correctChars: totalCorrectKeystrokes,
     accuracy,
     timeElapsed: timeInSeconds,
-    cpm,
-    wpm,
+    cpm: Math.round(cpm),
+    wpm: Math.round(wpm),
     score,
   };
 }

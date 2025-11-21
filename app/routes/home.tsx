@@ -3,6 +3,7 @@ import type { Route } from "./+types/home";
 import { Link, useLoaderData } from "react-router";
 import { useLanguage } from "~/contexts/LanguageContext";
 import { sql } from "~/lib/db.server";
+import { DosWindow } from "~/components/DosWindow";
 
 interface Score {
   id: number;
@@ -168,9 +169,9 @@ export default function Home() {
   };
 
   return (
-    <div className="w-full h-full bg-[#008080] px-4 pb-4 pt-16 relative flex flex-col">
+    <div className="w-full h-full bg-[#008080] px-4 pb-4 pt-11 relative flex flex-col">
       {/* Analog Clock */}
-      <div className="absolute top-0 right-0">
+      <div className="absolute -top-[20px] right-0 z-20">
         <AnalogClock />
       </div>
 
@@ -185,46 +186,44 @@ export default function Home() {
           const scores = rankings[typeKey];
 
           return (
-            <div
-              key={type.key}
-              className="bg-[#C0C0C0] border border-black p-2"
-            >
-              <div className="bg-[#0000AA] text-white px-2 py-1 mb-2">
-                {type.title}
-              </div>
-
-              {scores.length === 0 ? (
-                <div className="text-center py-4 text-black">
-                  {t("아직 기록이 없습니다", "No records yet")}
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {scores.map((score, index) => (
-                    <div
-                      key={score.id}
-                      className="flex items-center gap-2 px-1 text-black"
-                    >
-                      <div className="w-6">
-                        {index === 0 ? "1." : index === 1 ? "2." : index === 2 ? "3." : `${index + 1}.`}
-                      </div>
-                      <div className="flex-1 truncate">
-                        {score.name}
-                      </div>
-                      <div className="text-right">
-                        {score.score.toLocaleString()}
-                      </div>
+            <DosWindow key={type.key} title={type.title} className="flex-1">
+              <div className="p-2 flex flex-col h-full">
+                {scores.length === 0 ? (
+                  <div className="text-center py-4 text-black flex-1 flex items-center justify-center">
+                    {t("아직 기록이 없습니다", "No records yet")}
+                  </div>
+                ) : (
+                  <div className="flex-1">
+                    {/* Header */}
+                    <div className="flex items-center gap-2 px-1 text-black border-b border-[#808080] pb-1 mb-1">
+                      <div className="w-6">#</div>
+                      <div className="flex-1">{t("이름", "Name")}</div>
+                      <div className="w-16 text-right">{t("타수", "CPM")}</div>
                     </div>
-                  ))}
-                </div>
-              )}
+                    {/* Scores */}
+                    <div className="space-y-0.5">
+                      {scores.map((score, index) => (
+                        <div
+                          key={score.id}
+                          className={`flex items-center gap-2 px-1 text-black ${index === 0 ? "bg-[#FFFF00]" : ""}`}
+                        >
+                          <div className="w-6">{index + 1}</div>
+                          <div className="flex-1 truncate">{score.name}</div>
+                          <div className="w-16 text-right">{score.score.toLocaleString()}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-              <Link
-                to={`/rankings/${type.key}`}
-                className="block mt-2 text-center text-black hover:bg-[#0000AA] hover:text-white px-2 py-1"
-              >
-                {t("전체 보기", "View All")}
-              </Link>
-            </div>
+                <Link
+                  to={`/rankings/${type.key}`}
+                  className="block mt-2 text-center text-black border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-[#C0C0C0] hover:bg-[#D0D0D0] py-0.5"
+                >
+                  {t("전체 보기", "View All")}
+                </Link>
+              </div>
+            </DosWindow>
           );
         })}
       </div>
