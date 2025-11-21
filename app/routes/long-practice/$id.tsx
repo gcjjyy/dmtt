@@ -276,8 +276,8 @@ export default function LongPracticeTyping() {
     const grade = getTypingGrade(stats.accuracy, stats.cpm);
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-8">
-        <div className="max-w-2xl mx-auto">
+      <div className="p-8">
+        <div className="w-full">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-xl">
             <h1 className="text-center mb-4 text-gray-900 dark:text-white">
               {t("연습 완료!", "Practice Complete!")}
@@ -351,8 +351,8 @@ export default function LongPracticeTyping() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="p-8">
+      <div className="w-full">
         <div className="flex justify-between items-center mb-6">
           <Link
             to="/long-practice"

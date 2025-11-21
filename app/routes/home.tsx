@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Route } from "./+types/home";
 import { Link, useLoaderData } from "react-router";
 import { useLanguage } from "~/contexts/LanguageContext";
@@ -70,175 +70,163 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-export default function Home() {
-  const { t, language } = useLanguage();
-  const { rankings } = useLoaderData<typeof loader>();
-
-  // Get username from localStorage (client-side only)
-  const [username, setUsername] = useState("");
+function AnalogClock() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [time, setTime] = useState(new Date());
 
   useEffect(() => {
-    const savedUsername = localStorage.getItem("typing-practice-username") || "";
-    setUsername(savedUsername);
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
-  const menuItems = [
-    {
-      to: `/short-practice?lang=${language}`,
-      title: t("단문 연습", "Short Sentences"),
-      desc: t("짧은 문장으로 연습하기", "Practice with short sentences"),
-      icon: "📝",
-    },
-    {
-      to: `/long-practice?lang=${language}`,
-      title: t("장문 연습", "Long Texts"),
-      desc: t("긴 글로 연습하기", "Practice with long texts"),
-      icon: "📖",
-    },
-    {
-      to: `/venice?lang=${language}`,
-      title: t("베네치아 게임", "Venice Game"),
-      desc: t("떨어지는 단어 게임", "Falling words game"),
-      icon: "🎮",
-    },
-    {
-      to: "/settings",
-      title: t("설정", "Settings"),
-      desc: t("언어 및 설정 변경", "Change language and settings"),
-      icon: "⚙️",
-    },
-  ];
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-  const rankingTypes = [
-    { key: "short", title: t("단문 연습", "Short Practice"), icon: "📝" },
-    { key: "long", title: t("장문 연습", "Long Practice"), icon: "📖" },
-    { key: "venice", title: t("베네치아 게임", "Venice Game"), icon: "🎮" },
-  ];
+    const size = 56;
+    const center = size / 2;
+    const radius = center - 2;
+
+    // Disable anti-aliasing
+    ctx.imageSmoothingEnabled = false;
+
+    // Clear
+    ctx.fillStyle = "#FFFF00";
+    ctx.fillRect(0, 0, size, size);
+
+    // Hour marks (dots)
+    for (let i = 0; i < 12; i++) {
+      const angle = (i * Math.PI) / 6 - Math.PI / 2;
+      const x = center + Math.cos(angle) * (radius - 2);
+      const y = center + Math.sin(angle) * (radius - 2);
+      ctx.fillStyle = "#000";
+      ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+    }
+
+    const hours = time.getHours() % 12;
+    const minutes = time.getMinutes();
+    const seconds = time.getSeconds();
+
+    // Hour hand
+    const hourAngle = ((hours + minutes / 60) * Math.PI) / 6 - Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(center, center);
+    ctx.lineTo(center + Math.cos(hourAngle) * (radius * 0.5), center + Math.sin(hourAngle) * (radius * 0.5));
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Minute hand
+    const minuteAngle = ((minutes + seconds / 60) * Math.PI) / 30 - Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(center, center);
+    ctx.lineTo(center + Math.cos(minuteAngle) * (radius * 0.7), center + Math.sin(minuteAngle) * (radius * 0.7));
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Second hand
+    const secondAngle = (seconds * Math.PI) / 30 - Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(center, center);
+    ctx.lineTo(center + Math.cos(secondAngle) * (radius * 0.8), center + Math.sin(secondAngle) * (radius * 0.8));
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    // Center dot
+    ctx.fillStyle = "#000";
+    ctx.fillRect(center - 1, center - 1, 2, 2);
+  }, [time]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      <div className="container mx-auto px-4 py-16">
-        {/* User Info Bar */}
-        <div className="flex justify-end items-center mb-8">
-          <div className="flex items-center gap-4">
-            <div className="text-gray-900 dark:text-white">
-              {username}{t("님", "")}
-            </div>
-            <Link
-              to="/settings"
-              className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-              title={t("설정", "Settings")}
+    <canvas
+      ref={canvasRef}
+      width={56}
+      height={56}
+      className="border-l border-b border-black"
+    />
+  );
+}
+
+export default function Home() {
+  const { t } = useLanguage();
+  const { rankings } = useLoaderData<typeof loader>();
+
+  const rankingTypes = [
+    { key: "short", title: t("단문 연습", "Short Practice") },
+    { key: "long", title: t("장문 연습", "Long Practice") },
+    { key: "venice", title: t("베네치아 게임", "Venice Game") },
+  ];
+
+  const currentMonth = new Date().getMonth() + 1;
+  const monthNames = {
+    ko: ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"],
+    en: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+  };
+
+  return (
+    <div className="w-full h-full bg-[#008080] px-4 pb-4 pt-16 relative flex flex-col">
+      {/* Analog Clock */}
+      <div className="absolute top-0 right-0">
+        <AnalogClock />
+      </div>
+
+      {/* Title */}
+      <div className="text-center text-white mb-4">
+        {t(`이번 달(${monthNames.ko[currentMonth - 1]}) 랭킹`, `This Month (${monthNames.en[currentMonth - 1]}) Rankings`)}
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 flex-1">
+        {rankingTypes.map((type) => {
+          const typeKey = type.key as "short" | "long" | "venice";
+          const scores = rankings[typeKey];
+
+          return (
+            <div
+              key={type.key}
+              className="bg-[#C0C0C0] border border-black p-2"
             >
-              ⚙️
-            </Link>
-          </div>
-        </div>
+              <div className="bg-[#0000AA] text-white px-2 py-1 mb-2">
+                {type.title}
+              </div>
 
-        <div className="text-center mb-12">
-          <h1 className="text-gray-900 dark:text-white mb-4">
-            {t("타자 연습", "Typing Practice")}
-          </h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            {t("한글과 영문 타자 실력을 향상시켜보세요", "Improve your Korean and English typing skills")}
-          </p>
-        </div>
-
-        {/* Menu Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto mb-16">
-          {menuItems.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 border-2 border-transparent hover:border-blue-500"
-            >
-              <div className="mb-4">{item.icon}</div>
-              <h2 className="text-gray-900 dark:text-white mb-2">
-                {item.title}
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400">{item.desc}</p>
-            </Link>
-          ))}
-        </div>
-
-        {/* Rankings Section */}
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-gray-900 dark:text-white mb-8 text-center">
-            🏆 {t("랭킹", "Rankings")}
-          </h2>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {rankingTypes.map((type) => {
-              const typeKey = type.key as "short" | "long" | "venice";
-              const scores = rankings[typeKey];
-
-              return (
-                <div
-                  key={type.key}
-                  className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg"
-                >
-                  <div className="flex items-center gap-3 mb-6">
-                    <span>{type.icon}</span>
-                    <h3 className="text-gray-900 dark:text-white">
-                      {type.title}
-                    </h3>
-                  </div>
-
-                  {scores.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                      {t("아직 기록이 없습니다", "No records yet")}
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {scores.map((score, index) => (
-                        <div
-                          key={score.id}
-                          className={`flex items-center gap-3 p-3 rounded-lg ${
-                            index === 0
-                              ? "bg-yellow-50 dark:bg-yellow-900/20"
-                              : index === 1
-                              ? "bg-gray-100 dark:bg-gray-700/50"
-                              : index === 2
-                              ? "bg-orange-50 dark:bg-orange-900/20"
-                              : "bg-gray-50 dark:bg-gray-700/30"
-                          }`}
-                        >
-                          <div className="w-8 text-center">
-                            {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `${index + 1}`}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-gray-900 dark:text-white truncate">
-                              {score.name}
-                            </div>
-                            <div className="text-gray-600 dark:text-gray-400">
-                              {score.extra?.accuracy && (
-                                <span>{t("정확도", "Accuracy")} {score.extra.accuracy.toFixed(1)}%</span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-blue-600 dark:text-blue-400">
-                              {score.score.toLocaleString()}
-                            </div>
-                            <div className="text-gray-500 dark:text-gray-500">
-                              {t("타수", "CPM")}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <Link
-                    to={`/rankings/${type.key}`}
-                    className="block mt-4 text-center text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    {t("전체 보기", "View All")} →
-                  </Link>
+              {scores.length === 0 ? (
+                <div className="text-center py-4 text-black">
+                  {t("아직 기록이 없습니다", "No records yet")}
                 </div>
-              );
-            })}
-          </div>
-        </div>
+              ) : (
+                <div className="space-y-1">
+                  {scores.map((score, index) => (
+                    <div
+                      key={score.id}
+                      className="flex items-center gap-2 px-1 text-black"
+                    >
+                      <div className="w-6">
+                        {index === 0 ? "1." : index === 1 ? "2." : index === 2 ? "3." : `${index + 1}.`}
+                      </div>
+                      <div className="flex-1 truncate">
+                        {score.name}
+                      </div>
+                      <div className="text-right">
+                        {score.score.toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <Link
+                to={`/rankings/${type.key}`}
+                className="block mt-2 text-center text-black hover:bg-[#0000AA] hover:text-white px-2 py-1"
+              >
+                {t("전체 보기", "View All")}
+              </Link>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

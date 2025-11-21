@@ -318,8 +318,8 @@ export default function VeniceGame() {
 
   if (!gameStarted || gameOver) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 dark:from-gray-900 dark:to-gray-800 p-8">
-        <div className="max-w-2xl mx-auto">
+      <div className="p-8">
+        <div className="w-full">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-xl">
             {gameOver ? (
               <>
@@ -441,8 +441,8 @@ export default function VeniceGame() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 dark:from-gray-900 dark:to-gray-800 p-8">
-      <div className="max-w-5xl mx-auto">
+    <div className="p-8">
+      <div className="w-full">
         {/* Stats */}
         <div className="flex justify-between items-center mb-6">
           <div className="bg-white dark:bg-gray-800 rounded-lg px-6 py-3 shadow-lg">
@@ -470,23 +470,18 @@ export default function VeniceGame() {
         {/* Game Area */}
         <div
           ref={gameAreaRef}
-          className="relative bg-gradient-to-b from-teal-500 to-teal-600 dark:from-teal-700 dark:to-teal-800 rounded-2xl shadow-2xl overflow-hidden"
-          style={{ width: GAME_WIDTH, height: GAME_HEIGHT, margin: "0 auto" }}
+          className="relative bg-gradient-to-b from-teal-500 to-teal-600 dark:from-teal-700 dark:to-teal-800 rounded-2xl shadow-2xl overflow-hidden w-[800px] h-[600px] mx-auto"
         >
           {/* Falling Words */}
           {fallingWords.map((word) => (
             <div
               key={word.id}
-              className={`absolute ${
+              className={`absolute transition-none ${
                 word.isVirus
                   ? "text-yellow-400 dark:text-yellow-300"
                   : "text-gray-900 dark:text-white"
               }`}
-              style={{
-                left: word.x,
-                top: word.y,
-                transition: "none",
-              }}
+              style={{ left: word.x, top: word.y }}
             >
               {word.isHidden ? "???" : word.word}
             </div>
