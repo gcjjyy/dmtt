@@ -46,8 +46,9 @@ export default function VeniceGame() {
   const [gameStarted, setGameStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
-  const [lives, setLives] = useState(5);
+  const [bricks, setBricks] = useState(12);
   const [level, setLevel] = useState(1);
+  const [waitingForStart, setWaitingForStart] = useState(true);
   const [fallingWords, setFallingWords] = useState<FallingWord[]>([]);
   const [inputValue, setInputValue] = useState("");
   const nextWordIdRef = useRef(0);
@@ -68,9 +69,27 @@ export default function VeniceGame() {
   const animationRef = useRef<number | undefined>(undefined);
 
   const GAME_WIDTH = 800;
-  const GAME_HEIGHT = 600;
+  const GAME_HEIGHT = 640;
+  const WAVE_HEIGHT = 16;
+  const BRICK_HEIGHT = 64; // 4 rows × 16px
+  const INPUT_HEIGHT = 48;
+  const WAVE_TOP = GAME_HEIGHT - WAVE_HEIGHT; // 624
+  const BRICK_TOP = GAME_HEIGHT - WAVE_HEIGHT - BRICK_HEIGHT; // 560
+  const INPUT_TOP = GAME_HEIGHT - WAVE_HEIGHT - BRICK_HEIGHT - INPUT_HEIGHT; // 512
   const BASE_SPEED = 1;
   const WORD_SPAWN_INTERVAL = 2000; // milliseconds
+
+  // Spacebar handler to start game
+  useEffect(() => {
+    const handleSpace = (e: KeyboardEvent) => {
+      if (e.code === "Space" && waitingForStart && !gameStarted) {
+        e.preventDefault();
+        startGame();
+      }
+    };
+    window.addEventListener("keydown", handleSpace);
+    return () => window.removeEventListener("keydown", handleSpace);
+  }, [waitingForStart, gameStarted]);
 
   useEffect(() => {
     if (gameStarted && !gameOver) {
@@ -104,7 +123,7 @@ export default function VeniceGame() {
       if (!username) return;
 
       const gameDuration = (Date.now() - gameStartTime) / 1000; // seconds
-      const finalAccuracy = score > 0 ? Math.min(100, (score / (score + lives * 100)) * 100) : 100;
+      const finalAccuracy = score > 0 ? Math.min(100, (score / (score + bricks * 100)) * 100) : 100;
 
       try {
         await fetch("/api/score/submit", {
@@ -120,7 +139,7 @@ export default function VeniceGame() {
             wordsCaught: wordsCaught,
             wordsMissed: wordsMissed,
             gameDuration: gameDuration,
-            livesRemaining: lives,
+            livesRemaining: bricks,
           }),
         });
       } catch (err) {
@@ -129,7 +148,7 @@ export default function VeniceGame() {
     };
 
     submitScore();
-  }, [gameOver, sessionToken, gameStartTime, score, lives, level, wordsCaught, wordsMissed]);
+  }, [gameOver, sessionToken, gameStartTime, score, bricks, level, wordsCaught, wordsMissed]);
 
   const spawnNewWord = () => {
     const randomWord = words[Math.floor(Math.random() * words.length)];
@@ -186,7 +205,7 @@ export default function VeniceGame() {
 
       case "heal":
         setVirusMessage(t("재건 바이러스!", "Heal Virus!"));
-        setLives(5);
+        setBricks(12);
         break;
 
       case "speedup":
@@ -267,27 +286,29 @@ export default function VeniceGame() {
         return true;
       });
 
-      // 바닥에 도달한 단어들
-      const reachedBottom = updated.filter((w) => w.y >= GAME_HEIGHT);
-      if (reachedBottom.length > 0) {
-        // 바이러스가 아니거나, 에이즈 감염 상태에서는 생명 감소
-        const damagingWords = reachedBottom.filter(
+      // 물결 또는 입력박스에 도달한 단어들
+      const reachedDangerZone = updated.filter(
+        (w) => w.y >= INPUT_TOP || w.y >= WAVE_TOP
+      );
+      if (reachedDangerZone.length > 0) {
+        // 바이러스가 아니거나, 에이즈 감염 상태에서는 벽돌 감소
+        const damagingWords = reachedDangerZone.filter(
           (w) => !w.isVirus || isAidsInfected
         );
 
         if (damagingWords.length > 0) {
           setWordsMissed((prev) => prev + damagingWords.length);
-          setLives((prevLives) => {
-            const newLives = prevLives - damagingWords.length;
-            if (newLives <= 0) {
+          setBricks((prevBricks) => {
+            const newBricks = prevBricks - damagingWords.length;
+            if (newBricks <= 0) {
               setGameOver(true);
             }
-            return Math.max(0, newLives);
+            return Math.max(0, newBricks);
           });
         }
 
         // 에이즈 바이러스 체크 - 바이러스를 무시하고 보냈는지
-        const ignoredViruses = reachedBottom.filter((w) => w.isVirus);
+        const ignoredViruses = reachedDangerZone.filter((w) => w.isVirus);
         if (ignoredViruses.length > 0 && ignoredViruses.some((w) => w.word.includes("AIDS") || Math.random() < 0.3)) {
           setIsAidsInfected(true);
           setVirusMessage(t("에이즈 바이러스 감염!", "AIDS Infected!"));
@@ -295,8 +316,8 @@ export default function VeniceGame() {
         }
       }
 
-      // 화면에 남아있는 단어만 유지
-      return updated.filter((w) => w.y < GAME_HEIGHT);
+      // 화면에 남아있는 단어만 유지 (물결 위쪽만)
+      return updated.filter((w) => w.y < WAVE_TOP);
     });
   };
 
@@ -346,7 +367,7 @@ export default function VeniceGame() {
     setGameStarted(true);
     setGameOver(false);
     setScore(0);
-    setLives(5);
+    setBricks(12);
     setLevel(1);
     setFallingWords([]);
     setInputValue("");
@@ -359,6 +380,7 @@ export default function VeniceGame() {
     setWordsCaught(0);
     setWordsMissed(0);
     setGameStartTime(Date.now());
+    setWaitingForStart(false);
 
     // Create practice session
     try {
@@ -376,126 +398,62 @@ export default function VeniceGame() {
     }
   };
 
-  const accuracy = score > 0 ? Math.min(100, (score / (score + lives * 100)) * 100) : 100;
+  const accuracy = score > 0 ? Math.min(100, (score / (score + bricks * 100)) * 100) : 100;
 
-  if (!gameStarted || gameOver) {
+  if (gameOver) {
     return (
       <div className="p-8">
         <div className="w-full">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-xl">
-            {gameOver ? (
-              <>
-                <h1 className="text-center mb-8 text-gray-900 dark:text-white">
-                  {t("게임 오버!", "Game Over!")}
-                </h1>
+            <h1 className="text-center mb-8 text-gray-900 dark:text-white">
+              {t("게임 오버!", "Game Over!")}
+            </h1>
 
-                <div className="text-center mb-8">
-                  <div className="text-purple-600 dark:text-purple-400 mb-4">
-                    {score.toLocaleString()}
-                  </div>
-                  <div className="text-gray-600 dark:text-gray-400">
-                    {t("점수", "Score")}
-                  </div>
-                </div>
+            <div className="text-center mb-8">
+              <div className="text-purple-600 dark:text-purple-400 mb-4">
+                {score.toLocaleString()}
+              </div>
+              <div className="text-gray-600 dark:text-gray-400">
+                {t("점수", "Score")}
+              </div>
+            </div>
 
-                <div className="grid grid-cols-2 gap-4 mb-8">
-                  <div className="bg-purple-50 dark:bg-gray-700 p-4 rounded-lg">
-                    <div className="text-gray-600 dark:text-gray-400">
-                      {t("레벨", "Level")}
-                    </div>
-                    <div className="text-gray-900 dark:text-white">
-                      {level}
-                    </div>
-                  </div>
-                  <div className="bg-purple-50 dark:bg-gray-700 p-4 rounded-lg">
-                    <div className="text-gray-600 dark:text-gray-400">
-                      {t("정확도", "Accuracy")}
-                    </div>
-                    <div className="text-gray-900 dark:text-white">
-                      {accuracy.toFixed(1)}%
-                    </div>
-                  </div>
+            <div className="grid grid-cols-2 gap-4 mb-8">
+              <div className="bg-purple-50 dark:bg-gray-700 p-4 rounded-lg">
+                <div className="text-gray-600 dark:text-gray-400">
+                  {t("레벨", "Level")}
                 </div>
+                <div className="text-gray-900 dark:text-white">
+                  {level}
+                </div>
+              </div>
+              <div className="bg-purple-50 dark:bg-gray-700 p-4 rounded-lg">
+                <div className="text-gray-600 dark:text-gray-400">
+                  {t("정확도", "Accuracy")}
+                </div>
+                <div className="text-gray-900 dark:text-white">
+                  {accuracy.toFixed(1)}%
+                </div>
+              </div>
+            </div>
 
-                <div className="flex gap-4">
-                  <button
-                    onClick={startGame}
-                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-lg"
-                  >
-                    {t("다시 하기", "Play Again")}
-                  </button>
-                  <Link
-                    to="/"
-                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 px-6 rounded-lg text-center"
-                  >
-                    {t("메인으로", "Home")}
-                  </Link>
-                </div>
-              </>
-            ) : (
-              <>
-                <h1 className="text-center mb-4 text-gray-900 dark:text-white">
-                  {t("베네치아 게임", "Venice Game")}
-                </h1>
-                <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
-                  {t(
-                    "떨어지는 단어를 입력해서 제거하세요!",
-                    "Type the falling words to remove them!"
-                  )}
-                </p>
-
-                <div className="mb-8 space-y-4">
-                  <div className="flex items-center gap-4">
-                    <span>⌨️</span>
-                    <div>
-                      <h3 className="text-gray-900 dark:text-white">
-                        {t("단어를 입력하세요", "Type the words")}
-                      </h3>
-                      <p className="text-gray-600 dark:text-gray-400">
-                        {t("정확히 입력하면 단어가 사라집니다", "Type exactly to remove words")}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span>❤️</span>
-                    <div>
-                      <h3 className="text-gray-900 dark:text-white">
-                        {t("생명 5개", "5 Lives")}
-                      </h3>
-                      <p className="text-gray-600 dark:text-gray-400">
-                        {t("바닥에 닿으면 생명 감소", "Lose life when word reaches bottom")}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span>⚡</span>
-                    <div>
-                      <h3 className="text-gray-900 dark:text-white">
-                        {t("레벨업", "Level Up")}
-                      </h3>
-                      <p className="text-gray-600 dark:text-gray-400">
-                        {t("점수가 오르면 속도 증가", "Speed increases with score")}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <button
-                    onClick={startGame}
-                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-4 px-6 rounded-lg"
-                  >
-                    {t("게임 시작", "Start Game")}
-                  </button>
-                  <Link
-                    to="/"
-                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-4 px-6 rounded-lg text-center"
-                  >
-                    {t("돌아가기", "Back")}
-                  </Link>
-                </div>
-              </>
-            )}
+            <div className="flex gap-4">
+              <button
+                onClick={() => {
+                  setWaitingForStart(true);
+                  setGameOver(false);
+                }}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-lg"
+              >
+                {t("다시 하기", "Play Again")}
+              </button>
+              <Link
+                to="/"
+                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 px-6 rounded-lg text-center"
+              >
+                {t("메인으로", "Home")}
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -522,9 +480,9 @@ export default function VeniceGame() {
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-lg px-6 py-3 shadow-lg">
-            <div className="text-gray-600 dark:text-gray-400">{t("생명", "Lives")}</div>
-            <div className="text-red-600 dark:text-red-400">
-              {"❤️".repeat(lives)}
+            <div className="text-gray-600 dark:text-gray-400">{t("벽돌", "Bricks")}</div>
+            <div className="text-gray-900 dark:text-white">
+              {bricks} / 12
             </div>
           </div>
         </div>
@@ -532,7 +490,7 @@ export default function VeniceGame() {
         {/* Game Area */}
         <div
           ref={gameAreaRef}
-          className="relative bg-gradient-to-b from-teal-500 to-teal-600 dark:from-teal-700 dark:to-teal-800 rounded-2xl shadow-2xl overflow-hidden w-[800px] h-[600px] mx-auto"
+          className="relative bg-gradient-to-b from-teal-500 to-teal-600 dark:from-teal-700 dark:to-teal-800 rounded-2xl shadow-2xl overflow-hidden w-[800px] h-[640px] mx-auto"
         >
           {/* Falling Words */}
           {fallingWords.map((word) => (
@@ -592,21 +550,58 @@ export default function VeniceGame() {
               <div className="text-white">{t("게임 오버", "GAME OVER")}</div>
             </div>
           )}
-        </div>
 
-        {/* Input */}
-        <div className="mt-6">
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputValue}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            onPaste={(e) => e.preventDefault()}
-            className="w-full p-4 border-4 border-purple-500 rounded-lg focus:border-purple-600 focus:outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-center"
-            placeholder={t("단어를 입력하고 스페이스바를 누르세요...", "Type words and press spacebar...")}
-            autoComplete="off"
-            spellCheck={false}
+          {/* Waiting for Start Overlay */}
+          {waitingForStart && !gameStarted && (
+            <div className="absolute inset-0 bg-black/30 flex items-center justify-center pointer-events-none">
+              <div className="text-center">
+                <div className="text-6xl text-white mb-4">{t("레벨", "Level")} {level}</div>
+                <div className="text-2xl text-white">{t("스페이스바를 눌러 시작하세요", "Press Space to Start")}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Input Box (inside game area) */}
+          <div
+            className="absolute w-full px-4"
+            style={{ bottom: `${WAVE_HEIGHT + BRICK_HEIGHT}px`, height: `${INPUT_HEIGHT}px` }}
+          >
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              onPaste={(e) => e.preventDefault()}
+              className="w-full h-full border-2 border-black bg-white text-gray-900 text-center focus:outline-none text-lg"
+              placeholder={t("단어를 입력하고 스페이스바를 누르세요...", "Type words and press spacebar...")}
+              autoComplete="off"
+              spellCheck={false}
+              disabled={waitingForStart || gameOver}
+            />
+          </div>
+
+          {/* Brick Grid (3 columns × 4 rows) */}
+          <div
+            className="absolute w-full flex justify-center items-center"
+            style={{ bottom: `${WAVE_HEIGHT}px`, height: `${BRICK_HEIGHT}px` }}
+          >
+            <div className="grid grid-cols-3 gap-0.5">
+              {Array.from({ length: 12 }).map((_, index) => (
+                <div
+                  key={index}
+                  className={`w-16 h-4 border border-black ${
+                    index < bricks ? "bg-orange-600" : "bg-gray-400"
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Wave Layer */}
+          <div
+            className="absolute w-full bg-blue-600"
+            style={{ bottom: 0, height: `${WAVE_HEIGHT}px` }}
           />
         </div>
       </div>
