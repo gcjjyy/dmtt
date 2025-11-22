@@ -1,7 +1,8 @@
-import { Link, useLoaderData } from "react-router";
+import { Link, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/$type";
 import { useLanguage } from "~/contexts/LanguageContext";
 import { sql } from "~/lib/db.server";
+import { DosWindow } from "~/components/DosWindow";
 
 interface Score {
   id: number;
@@ -16,27 +17,36 @@ interface Score {
   } | null;
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params, request }: Route.LoaderArgs) {
   const { type } = params;
+  const url = new URL(request.url);
+
+  // Get year and month from query params, default to current date
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const year = parseInt(url.searchParams.get("year") || String(currentYear));
+  const month = parseInt(url.searchParams.get("month") || String(currentMonth));
 
   if (!["short", "long", "venice"].includes(type)) {
     throw new Response("Invalid type", { status: 400 });
   }
 
   try {
-    // Fetch top 20 scores for this type
+    // Fetch all scores for this type and time period
     const scores = await sql<Score[]>`
       SELECT id, name, type, score, created_at, extra
       FROM scores
       WHERE type = ${type}
+        AND EXTRACT(YEAR FROM created_at) = ${year}
+        AND EXTRACT(MONTH FROM created_at) = ${month}
       ORDER BY score DESC
-      LIMIT 20
     `;
 
-    return { scores, type };
+    return { scores, type, year, month, currentYear, currentMonth };
   } catch (error) {
     console.error("Error loading scores:", error);
-    return { scores: [], type };
+    return { scores: [], type, year, month, currentYear, currentMonth };
   }
 }
 
@@ -69,8 +79,9 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function Rankings() {
-  const { scores, type } = useLoaderData<typeof loader>();
+  const { scores, type, year, month, currentYear, currentMonth } = useLoaderData<typeof loader>();
   const { t } = useLanguage();
+  const navigate = useNavigate();
 
   const typeTitles = {
     short: t("단문 연습", "Short Practice"),
@@ -83,141 +94,147 @@ export default function Rankings() {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "short",
+      month: "numeric",
       day: "numeric",
     });
   };
 
+  const handlePrevMonth = () => {
+    const newMonth = month === 1 ? 12 : month - 1;
+    const newYear = month === 1 ? year - 1 : year;
+    navigate(`/rankings/${type}?year=${newYear}&month=${newMonth}`);
+  };
+
+  const handleNextMonth = () => {
+    // 현재 월이거나 미래면 이동 불가
+    if (year > currentYear || (year === currentYear && month >= currentMonth)) {
+      return;
+    }
+
+    const newMonth = month === 12 ? 1 : month + 1;
+    const newYear = month === 12 ? year + 1 : year;
+    navigate(`/rankings/${type}?year=${newYear}&month=${newMonth}`);
+  };
+
+  const isCurrentOrFuture = year > currentYear || (year === currentYear && month >= currentMonth);
+
+  const monthName = t(
+    `${month}월`,
+    new Date(year, month - 1).toLocaleDateString("en-US", { month: "long" })
+  );
+
   return (
-    <div className="w-full h-full bg-[#008080] p-4">
-      <div className="w-full">
-        <div className="flex justify-between items-center mb-8">
-          <Link
-            to="/"
-            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-          >
-            ← {t("돌아가기", "Back")}
-          </Link>
-          <h1 className="text-gray-900 dark:text-white">
-            {t("랭킹", "Rankings")} - {title}
-          </h1>
-          <div className="w-20"></div>
+    <div className="w-full h-full bg-[#008080] flex flex-col items-center justify-center p-4 gap-2">
+      {/* Tab Bar and Date Navigator Row */}
+      <div className="flex gap-2">
+        {/* Type Selector Buttons - 70% */}
+        <div className="w-[70%] bg-[#C0C0C0] border border-black">
+          <div className="border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080]">
+            <div className="mx-1 my-1 border border-t-[#808080] border-l-[#808080] border-b-white border-r-white bg-[#C0C0C0]">
+              <div className="flex">
+                <Link
+                  to={`/rankings/short?year=${year}&month=${month}`}
+                  className={`w-32 h-5 flex items-center justify-center border-r border-black whitespace-nowrap ${
+                    type === "short" ? "bg-black text-white" : "bg-white text-black hover:bg-gray-100"
+                  }`}
+                >
+                  {t("단문", "Short")}
+                </Link>
+                <Link
+                  to={`/rankings/long?year=${year}&month=${month}`}
+                  className={`w-32 h-5 flex items-center justify-center border-r border-black whitespace-nowrap ${
+                    type === "long" ? "bg-black text-white" : "bg-white text-black hover:bg-gray-100"
+                  }`}
+                >
+                  {t("장문", "Long")}
+                </Link>
+                <Link
+                  to={`/rankings/venice?year=${year}&month=${month}`}
+                  className={`w-32 h-5 flex items-center justify-center whitespace-nowrap ${
+                    type === "venice" ? "bg-black text-white" : "bg-white text-black hover:bg-gray-100"
+                  }`}
+                >
+                  {t("베네치아", "Venice")}
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Type selector */}
-        <div className="flex gap-4 mb-6 justify-center">
-          <Link
-            to="/rankings/short"
-            className={`px-6 py-3 rounded-lg transition-all ${
-              type === "short"
-                ? "bg-blue-600 text-white"
-                : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-blue-100 dark:hover:bg-gray-700"
-            }`}
-          >
-            {t("단문", "Short")}
-          </Link>
-          <Link
-            to="/rankings/long"
-            className={`px-6 py-3 rounded-lg transition-all ${
-              type === "long"
-                ? "bg-blue-600 text-white"
-                : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-blue-100 dark:hover:bg-gray-700"
-            }`}
-          >
-            {t("장문", "Long")}
-          </Link>
-          <Link
-            to="/rankings/venice"
-            className={`px-6 py-3 rounded-lg transition-all ${
-              type === "venice"
-                ? "bg-blue-600 text-white"
-                : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-blue-100 dark:hover:bg-gray-700"
-            }`}
-          >
-            {t("베네치아", "Venice")}
-          </Link>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden">
-          {scores.length === 0 ? (
-            <div className="p-12 text-center">
-              <div className="mb-4">🏆</div>
-              <p className="text-gray-600 dark:text-gray-400">
-                {t("아직 랭킹이 없습니다", "No rankings yet")}
-              </p>
-              <p className="text-gray-500 dark:text-gray-500 mt-2">
-                {t("첫 번째 기록을 세워보세요!", "Be the first to set a record!")}
-              </p>
+        {/* Month Navigator - 30% */}
+        <div className="w-[30%] bg-[#C0C0C0] border border-black">
+          <div className="border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080]">
+            <div className="mx-1 my-1 border border-t-[#808080] border-l-[#808080] border-b-white border-r-white bg-[#C0C0C0]">
+              <div className="flex items-center h-5">
+                <button
+                  onClick={handlePrevMonth}
+                  className="w-5 h-5 flex items-center justify-center text-black bg-[#C0C0C0] border-2 border-t-white border-l-white border-b-black border-r-black"
+                >
+                  ◀
+                </button>
+                <div className="flex-1 h-5 flex items-center justify-center px-2 text-black bg-white whitespace-nowrap">
+                  {year}{t("년", "")} {monthName}
+                </div>
+                <button
+                  onClick={handleNextMonth}
+                  disabled={isCurrentOrFuture}
+                  className={`w-5 h-5 flex items-center justify-center border-2 border-t-white border-l-white border-b-black border-r-black ${
+                    isCurrentOrFuture ? "text-gray-400 bg-[#C0C0C0] cursor-not-allowed" : "text-black bg-[#C0C0C0]"
+                  }`}
+                >
+                  ▶
+                </button>
+              </div>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-100 dark:bg-gray-700">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-gray-900 dark:text-white">
-                      {t("순위", "Rank")}
-                    </th>
-                    <th className="px-6 py-4 text-left text-gray-900 dark:text-white">
-                      {t("이름", "Name")}
-                    </th>
-                    <th className="px-6 py-4 text-center text-gray-900 dark:text-white">
-                      {type === "short" || type === "long" ? t("타수", "CPM") : t("점수", "Score")}
-                    </th>
-                    <th className="px-6 py-4 text-center text-gray-900 dark:text-white">
-                      {t("정확도", "Accuracy")}
-                    </th>
-                    <th className="px-6 py-4 text-center text-gray-900 dark:text-white">
-                      {t("날짜", "Date")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {scores.map((score, index) => (
-                    <tr
-                      key={score.id}
-                      className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${
-                        index < 3 ? "bg-yellow-50 dark:bg-yellow-900/10" : ""
-                      }`}
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span>
-                            {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : ""}
-                          </span>
-                          <span className="text-gray-900 dark:text-white">
-                            {index + 1}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-gray-900 dark:text-white">
-                          {score.name}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <div className="text-blue-600 dark:text-blue-400">
-                          {score.score.toLocaleString()}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <div className="text-gray-900 dark:text-white">
-                          {score.extra?.accuracy ? `${score.extra.accuracy.toFixed(1)}%` : "-"}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <div className="text-gray-600 dark:text-gray-400">
-                          {formatDate(score.created_at)}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          </div>
         </div>
       </div>
+
+      {/* Rankings Window */}
+      <DosWindow
+        title={`${title} ${t("랭킹", "Rankings")} - ${year}${t("년", "")} ${monthName}`}
+        className="w-full h-full"
+      >
+        {scores.length === 0 ? (
+          <div className="p-12 text-center">
+            <div className="mb-4 text-black">🏆</div>
+            <p className="text-black">
+              {t("이번 달 기록이 없습니다", "No records this month")}
+            </p>
+          </div>
+        ) : (
+          <div className="p-2 overflow-y-auto">
+            {/* Table Header */}
+            <div className="flex border-b-2 border-black pb-1 mb-2 sticky top-0 bg-[#C0C0C0]">
+              <div className="w-16 text-black">#</div>
+              <div className="flex-1 text-black">{t("이름", "Name")}</div>
+              <div className="w-24 text-black text-right">
+                {type === "short" || type === "long" ? t("타수", "CPM") : t("점수", "Score")}
+              </div>
+              <div className="w-24 text-black text-right">{t("정확도", "Accuracy")}</div>
+              <div className="w-24 text-black text-right">{t("날짜", "Date")}</div>
+            </div>
+
+            {/* Table Rows */}
+            {scores.map((score, index) => (
+              <div
+                key={score.id}
+                className={`flex py-1 hover:bg-[#000080] hover:text-white ${
+                  index < 3 ? "bg-[#FFFF00]" : ""
+                }`}
+              >
+                <div className="w-16">{index + 1}</div>
+                <div className="flex-1 truncate">{score.name}</div>
+                <div className="w-24 text-right">{score.score.toLocaleString()}</div>
+                <div className="w-24 text-right">
+                  {score.extra?.accuracy ? `${score.extra.accuracy.toFixed(1)}%` : "-"}
+                </div>
+                <div className="w-24 text-right">{formatDate(score.created_at)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </DosWindow>
     </div>
   );
 }
