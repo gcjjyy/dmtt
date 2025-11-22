@@ -57,6 +57,12 @@ export default function VeniceGame() {
   const [isAidsInfected, setIsAidsInfected] = useState(false);
   const [virusMessage, setVirusMessage] = useState<string | null>(null);
 
+  // Score submission tracking
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [gameStartTime, setGameStartTime] = useState<number | null>(null);
+  const [wordsCaught, setWordsCaught] = useState(0);
+  const [wordsMissed, setWordsMissed] = useState(0);
+
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const animationRef = useRef<number | undefined>(undefined);
@@ -88,6 +94,42 @@ export default function VeniceGame() {
       };
     }
   }, [gameStarted, gameOver, level]);
+
+  // Submit score when game is over
+  useEffect(() => {
+    const submitScore = async () => {
+      if (!gameOver || !sessionToken || !gameStartTime) return;
+
+      const username = localStorage.getItem("typing-practice-username");
+      if (!username) return;
+
+      const gameDuration = (Date.now() - gameStartTime) / 1000; // seconds
+      const finalAccuracy = score > 0 ? Math.min(100, (score / (score + lives * 100)) * 100) : 100;
+
+      try {
+        await fetch("/api/score/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            token: sessionToken,
+            name: username,
+            type: "venice",
+            score: score,
+            accuracy: finalAccuracy,
+            level: level,
+            wordsCaught: wordsCaught,
+            wordsMissed: wordsMissed,
+            gameDuration: gameDuration,
+            livesRemaining: lives,
+          }),
+        });
+      } catch (err) {
+        console.error("Failed to submit score:", err);
+      }
+    };
+
+    submitScore();
+  }, [gameOver, sessionToken, gameStartTime, score, lives, level, wordsCaught, wordsMissed]);
 
   const spawnNewWord = () => {
     const randomWord = words[Math.floor(Math.random() * words.length)];
@@ -234,6 +276,7 @@ export default function VeniceGame() {
         );
 
         if (damagingWords.length > 0) {
+          setWordsMissed((prev) => prev + damagingWords.length);
           setLives((prevLives) => {
             const newLives = prevLives - damagingWords.length;
             if (newLives <= 0) {
@@ -285,6 +328,7 @@ export default function VeniceGame() {
         }
 
         setScore((prev) => prev + matchedWord.word.length * 10);
+        setWordsCaught((prev) => prev + 1);
         setInputValue("");
 
         // Level up every 500 points
@@ -298,7 +342,7 @@ export default function VeniceGame() {
     }
   };
 
-  const startGame = () => {
+  const startGame = async () => {
     setGameStarted(true);
     setGameOver(false);
     setScore(0);
@@ -312,6 +356,24 @@ export default function VeniceGame() {
     setSpeedMultiplier(1);
     setIsAidsInfected(false);
     setVirusMessage(null);
+    setWordsCaught(0);
+    setWordsMissed(0);
+    setGameStartTime(Date.now());
+
+    // Create practice session
+    try {
+      const response = await fetch("/api/practice/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "venice" }),
+      });
+      const data = await response.json();
+      if (data.token) {
+        setSessionToken(data.token);
+      }
+    } catch (err) {
+      console.error("Failed to create session:", err);
+    }
   };
 
   const accuracy = score > 0 ? Math.min(100, (score / (score + lives * 100)) * 100) : 100;

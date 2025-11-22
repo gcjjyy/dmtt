@@ -214,6 +214,7 @@ export default function LongPracticeTyping() {
     allTypedText = allTypedText.trimEnd();
 
     const calculatedStats = calculateTypingStats(allOriginalText, allTypedText, timeElapsed, "long");
+    const grade = getTypingGrade(calculatedStats.accuracy, calculatedStats.cpm);
 
     setStats(calculatedStats);
     setIsFinished(true);
@@ -230,13 +231,15 @@ export default function LongPracticeTyping() {
             body: JSON.stringify({
               token: sessionToken,
               name: username,
-              originalText: allOriginalText,
-              typedText: allTypedText,
-              timeElapsed,
+              type: "long",
               score: calculatedStats.score,
               accuracy: calculatedStats.accuracy,
               cpm: calculatedStats.cpm,
-              sentence: textData.title, // Store title as reference
+              wpm: calculatedStats.wpm,
+              timeElapsed: timeElapsed,
+              grade: grade,
+              totalLines: targetLines.length,
+              completionRate: 100,
             }),
           });
         } catch (err) {

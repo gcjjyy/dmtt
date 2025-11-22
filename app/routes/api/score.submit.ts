@@ -13,13 +13,36 @@ import { validateScore, validateText, validateName } from "~/lib/validation.serv
 interface SubmitScoreRequest {
   token: string;
   name: string;
-  originalText: string;
-  typedText: string;
-  timeElapsed: number;
+  type?: string; // Practice mode type
+  originalText?: string; // Optional for venice game
+  typedText?: string; // Optional for venice game
+  timeElapsed?: number;
   score: number;
   accuracy: number;
-  cpm: number;
-  sentence?: string; // Optional reference info
+  cpm?: number;
+
+  // Common fields
+  wpm?: number;
+
+  // Short practice fields
+  totalChars?: number;
+  correctChars?: number;
+  totalSentences?: number;
+
+  // Long practice fields
+  grade?: string;
+  totalLines?: number;
+  completionRate?: number;
+
+  // Venice game fields
+  level?: number;
+  wordsCaught?: number;
+  wordsMissed?: number;
+  gameDuration?: number;
+  livesRemaining?: number;
+
+  // Deprecated
+  sentence?: string;
 }
 
 export async function action({ request }: { request: Request }) {
@@ -42,17 +65,30 @@ export async function action({ request }: { request: Request }) {
   const {
     token,
     name,
+    type: submittedType,
     originalText,
     typedText,
     timeElapsed,
     score,
     accuracy,
     cpm,
+    wpm,
+    totalChars,
+    correctChars,
+    totalSentences,
+    grade,
+    totalLines,
+    completionRate,
+    level,
+    wordsCaught,
+    wordsMissed,
+    gameDuration,
+    livesRemaining,
     sentence,
   } = body;
 
-  // Validate required fields
-  if (!token || !name || !originalText || !typedText || timeElapsed === undefined) {
+  // Validate required fields (originalText/typedText not required for venice)
+  if (!token || !name) {
     return Response.json(
       { error: "Missing required fields" },
       { status: 400 }
@@ -110,43 +146,45 @@ export async function action({ request }: { request: Request }) {
     );
   }
 
-  // 6. Validate text content
-  const textValidation = validateText(originalText);
-  if (!textValidation.valid) {
-    return Response.json(
-      { error: "Invalid original text", details: textValidation.errors },
-      { status: 400 }
-    );
-  }
+  // 6. Validate text content (only for non-venice games)
+  if (originalText && typedText) {
+    const textValidation = validateText(originalText);
+    if (!textValidation.valid) {
+      return Response.json(
+        { error: "Invalid original text", details: textValidation.errors },
+        { status: 400 }
+      );
+    }
 
-  const typedTextValidation = validateText(typedText);
-  if (!typedTextValidation.valid) {
-    return Response.json(
-      { error: "Invalid typed text", details: typedTextValidation.errors },
-      { status: 400 }
-    );
-  }
+    const typedTextValidation = validateText(typedText);
+    if (!typedTextValidation.valid) {
+      return Response.json(
+        { error: "Invalid typed text", details: typedTextValidation.errors },
+        { status: 400 }
+      );
+    }
 
-  // 7. Validate score (server-side recalculation)
-  const scoreValidation = validateScore(
-    originalText,
-    typedText,
-    timeElapsed,
-    score,
-    accuracy,
-    cpm,
-    session.type
-  );
-
-  if (!scoreValidation.valid) {
-    console.error("Score validation failed:", scoreValidation.errors);
-    return Response.json(
-      {
-        error: "Score validation failed",
-        details: scoreValidation.errors,
-      },
-      { status: 400 }
+    // 7. Validate score (server-side recalculation)
+    const scoreValidation = validateScore(
+      originalText,
+      typedText,
+      timeElapsed || 0,
+      score,
+      accuracy,
+      cpm || 0,
+      session.type
     );
+
+    if (!scoreValidation.valid) {
+      console.error("Score validation failed:", scoreValidation.errors);
+      return Response.json(
+        {
+          error: "Score validation failed",
+          details: scoreValidation.errors,
+        },
+        { status: 400 }
+      );
+    }
   }
 
   // 8. Record submission in session
@@ -160,12 +198,35 @@ export async function action({ request }: { request: Request }) {
 
   // 9. Save to database using PostgreSQL function
   try {
-    // Prepare extra data (include sentence as reference)
-    const extra = {
+    // Prepare extra data with all available fields
+    const extra: Record<string, any> = {
       accuracy,
-      cpm,
-      sentence: sentence || null,
     };
+
+    // Add optional common fields
+    if (cpm !== undefined) extra.cpm = cpm;
+    if (wpm !== undefined) extra.wpm = wpm;
+    if (timeElapsed !== undefined) extra.timeElapsed = timeElapsed;
+
+    // Short practice specific
+    if (totalChars !== undefined) extra.totalChars = totalChars;
+    if (correctChars !== undefined) extra.correctChars = correctChars;
+    if (totalSentences !== undefined) extra.totalSentences = totalSentences;
+
+    // Long practice specific
+    if (grade !== undefined) extra.grade = grade;
+    if (totalLines !== undefined) extra.totalLines = totalLines;
+    if (completionRate !== undefined) extra.completionRate = completionRate;
+
+    // Venice game specific
+    if (level !== undefined) extra.level = level;
+    if (wordsCaught !== undefined) extra.wordsCaught = wordsCaught;
+    if (wordsMissed !== undefined) extra.wordsMissed = wordsMissed;
+    if (gameDuration !== undefined) extra.gameDuration = gameDuration;
+    if (livesRemaining !== undefined) extra.livesRemaining = livesRemaining;
+
+    // Deprecated field for backward compatibility
+    if (sentence) extra.sentence = sentence;
 
     // Call upsert_score function
     // The function handles: only update if new score > old score

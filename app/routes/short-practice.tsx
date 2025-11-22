@@ -25,6 +25,7 @@ export default function ShortPractice() {
   const [currentAccuracy, setCurrentAccuracy] = useState(0);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [shuffledProverbs, setShuffledProverbs] = useState<string[]>([]);
+  const [totalSentences, setTotalSentences] = useState(0);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const typedTextRef = useRef(typedText);
@@ -124,6 +125,7 @@ export default function ShortPractice() {
     setCurrentCPM(sentenceStats.cpm);
     setCurrentAccuracy(sentenceStats.accuracy);
     setHighestCPM((prev) => Math.max(prev, sentenceStats.cpm));
+    setTotalSentences((prev) => prev + 1);
 
     if (sessionToken) {
       const username = localStorage.getItem("typing-practice-username");
@@ -135,13 +137,15 @@ export default function ShortPractice() {
             body: JSON.stringify({
               token: sessionToken,
               name: username,
-              originalText: currentProverb,
-              typedText: typedText,
-              timeElapsed,
+              type: "short",
               score: sentenceStats.score,
               accuracy: sentenceStats.accuracy,
               cpm: sentenceStats.cpm,
-              sentence: currentProverb,
+              wpm: sentenceStats.wpm,
+              totalChars: sentenceStats.totalChars,
+              correctChars: sentenceStats.correctChars,
+              timeElapsed: timeElapsed,
+              totalSentences: totalSentences + 1,
             }),
           });
         } catch (err) {

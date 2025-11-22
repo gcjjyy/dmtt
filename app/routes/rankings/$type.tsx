@@ -14,6 +14,24 @@ interface Score {
     accuracy?: number;
     cpm?: number;
     wpm?: number;
+    timeElapsed?: number;
+
+    // Short practice fields
+    totalChars?: number;
+    correctChars?: number;
+    totalSentences?: number;
+
+    // Long practice fields
+    grade?: string;
+    totalLines?: number;
+    completionRate?: number;
+
+    // Venice game fields
+    level?: number;
+    wordsCaught?: number;
+    wordsMissed?: number;
+    gameDuration?: number;
+    livesRemaining?: number;
   } | null;
 }
 
@@ -206,13 +224,38 @@ export default function Rankings() {
           <div className="p-2 overflow-y-auto">
             {/* Table Header */}
             <div className="flex border-b-2 border-black pb-1 mb-2 sticky top-0 bg-[#C0C0C0]">
-              <div className="w-16 text-black">#</div>
+              <div className="w-12 text-black">#</div>
               <div className="flex-1 text-black">{t("이름", "Name")}</div>
-              <div className="w-24 text-black text-right">
+              <div className="w-20 text-black text-right">
                 {type === "short" || type === "long" ? t("타수", "CPM") : t("점수", "Score")}
               </div>
-              <div className="w-24 text-black text-right">{t("정확도", "Accuracy")}</div>
-              <div className="w-24 text-black text-right">{t("날짜", "Date")}</div>
+              <div className="w-20 text-black text-right">{t("정확도", "Accuracy")}</div>
+
+              {/* Mode-specific columns */}
+              {type === "short" && (
+                <>
+                  <div className="w-20 text-black text-right">{t("WPM", "WPM")}</div>
+                  <div className="w-20 text-black text-right">{t("문장수", "Sentences")}</div>
+                </>
+              )}
+
+              {type === "long" && (
+                <>
+                  <div className="w-16 text-black text-right">{t("등급", "Grade")}</div>
+                  <div className="w-20 text-black text-right">{t("WPM", "WPM")}</div>
+                  <div className="w-20 text-black text-right">{t("줄수", "Lines")}</div>
+                </>
+              )}
+
+              {type === "venice" && (
+                <>
+                  <div className="w-16 text-black text-right">{t("레벨", "Level")}</div>
+                  <div className="w-20 text-black text-right">{t("성공", "Caught")}</div>
+                  <div className="w-20 text-black text-right">{t("실패", "Missed")}</div>
+                </>
+              )}
+
+              <div className="w-20 text-black text-right">{t("날짜", "Date")}</div>
             </div>
 
             {/* Table Rows */}
@@ -223,13 +266,54 @@ export default function Rankings() {
                   index < 3 ? "bg-[#FFFF00]" : ""
                 }`}
               >
-                <div className="w-16">{index + 1}</div>
+                <div className="w-12">{index + 1}</div>
                 <div className="flex-1 truncate">{score.name}</div>
-                <div className="w-24 text-right">{score.score.toLocaleString()}</div>
-                <div className="w-24 text-right">
+                <div className="w-20 text-right">{score.score.toLocaleString()}</div>
+                <div className="w-20 text-right">
                   {score.extra?.accuracy ? `${score.extra.accuracy.toFixed(1)}%` : "-"}
                 </div>
-                <div className="w-24 text-right">{formatDate(score.created_at)}</div>
+
+                {/* Mode-specific columns */}
+                {type === "short" && (
+                  <>
+                    <div className="w-20 text-right">
+                      {score.extra?.wpm ? score.extra.wpm.toFixed(0) : "-"}
+                    </div>
+                    <div className="w-20 text-right">
+                      {score.extra?.totalSentences || "-"}
+                    </div>
+                  </>
+                )}
+
+                {type === "long" && (
+                  <>
+                    <div className="w-16 text-right">
+                      {score.extra?.grade || "-"}
+                    </div>
+                    <div className="w-20 text-right">
+                      {score.extra?.wpm ? score.extra.wpm.toFixed(0) : "-"}
+                    </div>
+                    <div className="w-20 text-right">
+                      {score.extra?.totalLines || "-"}
+                    </div>
+                  </>
+                )}
+
+                {type === "venice" && (
+                  <>
+                    <div className="w-16 text-right">
+                      {score.extra?.level || "-"}
+                    </div>
+                    <div className="w-20 text-right">
+                      {score.extra?.wordsCaught || "-"}
+                    </div>
+                    <div className="w-20 text-right">
+                      {score.extra?.wordsMissed || "-"}
+                    </div>
+                  </>
+                )}
+
+                <div className="w-20 text-right">{formatDate(score.created_at)}</div>
               </div>
             ))}
           </div>
