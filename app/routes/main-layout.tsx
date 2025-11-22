@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Outlet, useNavigate } from "react-router";
 import { useLanguage } from "~/contexts/LanguageContext";
+import { useGameStatus } from "~/contexts/GameStatusContext";
 
 const HomeIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -13,6 +14,7 @@ type MenuKey = "home" | "dmtt" | "practice" | "game" | "ranking" | null;
 export default function MainLayout() {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
+  const { statusMessage } = useGameStatus();
   const [openMenu, setOpenMenu] = useState<MenuKey>(null);
   const [username, setUsername] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -154,7 +156,8 @@ export default function MainLayout() {
         </div>
 
         {/* Status Bar */}
-        <div className="h-5 bg-white text-black border-t border-black flex items-center px-2 justify-end">
+        <div className="h-5 bg-white text-black border-t border-black flex items-center px-2 justify-between">
+          <span>{statusMessage}</span>
           <span>{formatTime(currentTime)}</span>
         </div>
       </div>

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLoaderData } from "react-router";
 import type { Route } from "./+types/venice";
 import { useLanguage } from "~/contexts/LanguageContext";
+import { useGameStatus } from "~/contexts/GameStatusContext";
 import { loadWords } from "~/lib/data-loader.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -42,6 +43,7 @@ interface Mine {
 export default function VeniceGame() {
   const { words, language } = useLoaderData<typeof loader>();
   const { t } = useLanguage();
+  const { setStatusMessage } = useGameStatus();
 
   const [gameStarted, setGameStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -69,13 +71,13 @@ export default function VeniceGame() {
   const animationRef = useRef<number | undefined>(undefined);
 
   const GAME_WIDTH = 800;
-  const GAME_HEIGHT = 640;
+  const GAME_HEIGHT = 528;
   const WAVE_HEIGHT = 16;
   const BRICK_HEIGHT = 64; // 4 rows × 16px
   const INPUT_HEIGHT = 48;
-  const WAVE_TOP = GAME_HEIGHT - WAVE_HEIGHT; // 624
-  const BRICK_TOP = GAME_HEIGHT - WAVE_HEIGHT - BRICK_HEIGHT; // 560
-  const INPUT_TOP = GAME_HEIGHT - WAVE_HEIGHT - BRICK_HEIGHT - INPUT_HEIGHT; // 512
+  const WAVE_TOP = GAME_HEIGHT - WAVE_HEIGHT; // 512
+  const BRICK_TOP = GAME_HEIGHT - BRICK_HEIGHT; // 464
+  const INPUT_TOP = GAME_HEIGHT - BRICK_HEIGHT - INPUT_HEIGHT; // 416
   const BASE_SPEED = 1;
   const WORD_SPAWN_INTERVAL = 2000; // milliseconds
 
@@ -149,6 +151,26 @@ export default function VeniceGame() {
 
     submitScore();
   }, [gameOver, sessionToken, gameStartTime, score, bricks, level, wordsCaught, wordsMissed]);
+
+  // Update status bar message
+  useEffect(() => {
+    let message = "";
+
+    if (waitingForStart && !gameStarted) {
+      message = t("스페이스바를 눌러 시작하세요", "Press Space to Start");
+    } else if (virusMessage) {
+      message = virusMessage;
+    } else if (isFrozen) {
+      message = `❄️ ${t("마취 상태", "Frozen")}`;
+    } else if (isAidsInfected) {
+      message = `⚠️ ${t("에이즈 감염 상태", "AIDS Infected")}`;
+    }
+
+    setStatusMessage(message);
+
+    // Clear status message when component unmounts
+    return () => setStatusMessage("");
+  }, [waitingForStart, gameStarted, virusMessage, isFrozen, isAidsInfected, t, setStatusMessage]);
 
   const spawnNewWord = () => {
     const randomWord = words[Math.floor(Math.random() * words.length)];
@@ -461,37 +483,17 @@ export default function VeniceGame() {
   }
 
   return (
-    <div className="w-full h-full bg-[#008080] p-4">
-      <div className="w-full">
-        {/* Stats */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg px-6 py-3 shadow-lg">
-            <div className="text-gray-600 dark:text-gray-400">
-              {t("점수", "Score")}
-            </div>
-            <div className="text-purple-600 dark:text-purple-400">
-              {score.toLocaleString()}
-            </div>
+    <div className="w-full h-full bg-[#008080] flex flex-col items-center justify-end">
+      {/* Game Area */}
+      <div
+        ref={gameAreaRef}
+        className="relative overflow-hidden w-[800px] h-[528px]"
+      >
+          {/* Score and Level Display */}
+          <div className="absolute top-0 left-1/2 bg-[#008080] transform -translate-x-1/2 text-black">
+            {t("레벨", "Level")}: {level}  {t("점수", "Score")}: {score}
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg px-6 py-3 shadow-lg">
-            <div className="text-gray-600 dark:text-gray-400">{t("레벨", "Level")}</div>
-            <div className="text-gray-900 dark:text-white">{level}</div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg px-6 py-3 shadow-lg">
-            <div className="text-gray-600 dark:text-gray-400">{t("벽돌", "Bricks")}</div>
-            <div className="text-gray-900 dark:text-white">
-              {bricks} / 12
-            </div>
-          </div>
-        </div>
-
-        {/* Game Area */}
-        <div
-          ref={gameAreaRef}
-          className="relative bg-gradient-to-b from-teal-500 to-teal-600 dark:from-teal-700 dark:to-teal-800 rounded-2xl shadow-2xl overflow-hidden w-[800px] h-[640px] mx-auto"
-        >
           {/* Falling Words */}
           {fallingWords.map((word) => (
             <div
@@ -521,29 +523,6 @@ export default function VeniceGame() {
             </div>
           ))}
 
-          {/* Virus Message */}
-          {virusMessage && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="bg-black/80 text-white px-8 py-4 rounded-2xl animate-bounce">
-                {virusMessage}
-              </div>
-            </div>
-          )}
-
-          {/* AIDS Infection Warning */}
-          {isAidsInfected && (
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-2 rounded-lg shadow-lg">
-              ⚠️ {t("에이즈 감염 상태", "AIDS Infected")} ⚠️
-            </div>
-          )}
-
-          {/* Frozen Effect */}
-          {isFrozen && (
-            <div className="absolute top-20 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-6 py-2 rounded-lg shadow-lg">
-              ❄️ {t("마취 상태", "Frozen")} ❄️
-            </div>
-          )}
-
           {/* Game Over Overlay */}
           {gameOver && (
             <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
@@ -551,20 +530,10 @@ export default function VeniceGame() {
             </div>
           )}
 
-          {/* Waiting for Start Overlay */}
-          {waitingForStart && !gameStarted && (
-            <div className="absolute inset-0 bg-black/30 flex items-center justify-center pointer-events-none">
-              <div className="text-center">
-                <div className="text-6xl text-white mb-4">{t("레벨", "Level")} {level}</div>
-                <div className="text-2xl text-white">{t("스페이스바를 눌러 시작하세요", "Press Space to Start")}</div>
-              </div>
-            </div>
-          )}
-
           {/* Input Box (inside game area) */}
           <div
-            className="absolute w-full px-4"
-            style={{ bottom: `${WAVE_HEIGHT + BRICK_HEIGHT}px`, height: `${INPUT_HEIGHT}px` }}
+            className="absolute left-1/2 transform -translate-x-1/2"
+            style={{ bottom: `${BRICK_HEIGHT}px`, height: `${INPUT_HEIGHT}px`, width: '128px' }}
           >
             <input
               ref={inputRef}
@@ -574,7 +543,6 @@ export default function VeniceGame() {
               onKeyDown={handleKeyDown}
               onPaste={(e) => e.preventDefault()}
               className="w-full h-full border-2 border-black bg-white text-gray-900 text-center focus:outline-none text-lg"
-              placeholder={t("단어를 입력하고 스페이스바를 누르세요...", "Type words and press spacebar...")}
               autoComplete="off"
               spellCheck={false}
               disabled={waitingForStart || gameOver}
@@ -583,14 +551,14 @@ export default function VeniceGame() {
 
           {/* Brick Grid (3 columns × 4 rows) */}
           <div
-            className="absolute w-full flex justify-center items-center"
-            style={{ bottom: `${WAVE_HEIGHT}px`, height: `${BRICK_HEIGHT}px` }}
+            className="absolute w-full flex justify-center items-center z-10"
+            style={{ bottom: 0, height: `${BRICK_HEIGHT}px` }}
           >
-            <div className="grid grid-cols-3 gap-0.5">
+            <div className="grid grid-cols-3">
               {Array.from({ length: 12 }).map((_, index) => (
                 <div
                   key={index}
-                  className={`w-16 h-4 border border-black ${
+                  className={`w-8 h-4 border border-black ${
                     index < bricks ? "bg-orange-600" : "bg-gray-400"
                   }`}
                 />
@@ -600,10 +568,9 @@ export default function VeniceGame() {
 
           {/* Wave Layer */}
           <div
-            className="absolute w-full bg-blue-600"
+            className="absolute w-full bg-blue-600 z-0"
             style={{ bottom: 0, height: `${WAVE_HEIGHT}px` }}
           />
-        </div>
       </div>
     </div>
   );
