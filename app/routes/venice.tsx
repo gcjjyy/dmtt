@@ -4,6 +4,7 @@ import type { Route } from "./+types/venice";
 import { useLanguage } from "~/contexts/LanguageContext";
 import { useGameStatus } from "~/contexts/GameStatusContext";
 import { loadWords } from "~/lib/data-loader.server";
+import { DosWindow } from "~/components/DosWindow";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
@@ -689,16 +690,19 @@ export default function VeniceGame() {
         // 바이러스 단어인 경우 효과 발동
         if (matchedWord.isVirus) {
           triggerVirusEffect(matchedWord.x, matchedWord.y);
+        } else {
+          // 일반 단어만 점수 추가
+          const points = matchedWord.word.length * 10;
+          setScore((prev) => prev + points);
+
+          // Level up every 500 points (일반 단어만)
+          if ((score + points) % 500 === 0) {
+            setLevel((prev) => prev + 1);
+          }
         }
 
-        setScore((prev) => prev + matchedWord.word.length * 10);
         setWordsCaught((prev) => prev + 1);
         setInputValue("");
-
-        // Level up every 500 points
-        if ((score + matchedWord.word.length * 10) % 500 === 0) {
-          setLevel((prev) => prev + 1);
-        }
       } else {
         // 틀렸을 경우 입력 초기화
         setInputValue("");
@@ -827,8 +831,6 @@ export default function VeniceGame() {
     }
   };
 
-  const accuracy = score > 0 ? Math.min(100, (score / (score + bricks * 100)) * 100) : 100;
-
   return (
     <div className="w-full h-full bg-[#008080] flex flex-col items-center justify-end">
       {/* Game Area */}
@@ -873,97 +875,104 @@ export default function VeniceGame() {
           {/* Game Over Overlay with Rankings */}
           {gameOver && (
             <div className="absolute inset-0 flex items-center justify-center z-50">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-xl max-w-2xl w-full max-h-[90%] overflow-y-auto">
-                <h1 className="text-center mb-6 text-2xl font-bold text-gray-900 dark:text-white">
-                  {t("게임 오버!", "Game Over!")}
-                </h1>
+              <DosWindow title={t("베네치아 랭킹", "Venice Rankings")} className="w-96">
+                <div className="p-2">
+                  {veniceRankings.length > 0 ? (
+                    (() => {
+                      const username = localStorage.getItem('typing-practice-username') || '';
+                      // 내 위치 찾기
+                      const myIndex = veniceRankings.findIndex((r: any) => r.name === username);
 
-                {/* Current Score */}
-                <div className="text-center mb-6 pb-6 border-b border-gray-300 dark:border-gray-600">
-                  <div className="text-4xl font-bold text-purple-600 dark:text-purple-400 mb-2">
-                    {score.toLocaleString()}
-                  </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    {t("점수", "Score")}
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 mt-4">
-                    <div className="bg-purple-50 dark:bg-gray-700 p-3 rounded-lg">
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        {t("레벨", "Level")}
-                      </div>
-                      <div className="text-xl font-semibold text-gray-900 dark:text-white">
-                        {level}
-                      </div>
+                      // 표시할 랭킹 추출 (내 위 4명, 아래 4명, 최대 9명)
+                      let displayRankings: any[] = [];
+                      if (myIndex !== -1) {
+                        const start = Math.max(0, myIndex - 4);
+                        const end = Math.min(veniceRankings.length, myIndex + 5);
+                        displayRankings = veniceRankings.slice(start, end);
+                      } else {
+                        displayRankings = veniceRankings.slice(0, 9);
+                      }
+
+                      return (
+                        <>
+                          {/* Header */}
+                          <div className="flex items-center gap-2 px-1 text-black border-b border-[#808080] pb-1 mb-1">
+                            <div className="w-8">#</div>
+                            <div className="flex-1">{t("이름", "Name")}</div>
+                            <div className="w-12 text-right">{t("단계", "Lv")}</div>
+                            <div className="w-24 text-right">{t("점수", "Score")}</div>
+                          </div>
+                          {/* Scores */}
+                          <div className="space-y-0.5">
+                            {displayRankings.map((ranking: any) => {
+                              const actualRank = veniceRankings.findIndex((r: any) => r.id === ranking.id) + 1;
+                              const isMe = ranking.name === username;
+                              return (
+                                <div
+                                  key={ranking.id}
+                                  className={`flex items-center gap-2 px-1 ${isMe ? 'bg-black text-[#FFFF00]' : 'text-black'}`}
+                                >
+                                  <div className="w-8">{actualRank}</div>
+                                  <div className="flex-1 truncate">{ranking.name}</div>
+                                  <div className="w-12 text-right">{ranking.extra?.level || '-'}</div>
+                                  <div className="w-24 text-right">{ranking.score.toLocaleString()}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Buttons */}
+                          <div className="flex gap-2 mt-2 pt-2 border-t border-[#808080]">
+                            <button
+                              onClick={() => {
+                                // 게임 오버 상태 초기화
+                                setGameOver(false);
+                                setIsGameOverAnimating(false);
+                                setInputBoxFallCount(0);
+                                setVeniceRankings([]);
+                                isGameOverAnimatingRef.current = false;
+
+                                // 게임 상태 완전 초기화
+                                setGameStarted(false);
+                                setScore(0);
+                                setBricks(12);
+                                setLevel(1);
+                                setFallingWords([]);
+                                setInputValue("");
+                                nextWordIdRef.current = 0;
+                                setMines([]);
+                                setIsFrozen(false);
+                                setSpeedMultiplier(1);
+                                setIsAidsInfected(false);
+                                setVirusMessage(null);
+                                setWordsCaught(0);
+                                setWordsMissed(0);
+                                setGameStartTime(0);
+
+                                // 대기 상태로
+                                setWaitingForStart(true);
+                              }}
+                              className="flex-1 text-center text-black border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-[#C0C0C0] hover:bg-[#D0D0D0] h-7 flex items-center justify-center"
+                            >
+                              {t("다시하기", "Retry")}
+                            </button>
+                            <Link
+                              to="/"
+                              className="flex-1 text-center text-black border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-[#C0C0C0] hover:bg-[#D0D0D0] h-7 flex items-center justify-center"
+                            >
+                              {t("홈으로", "Home")}
+                            </Link>
+                          </div>
+                        </>
+                      );
+                    })()
+                  ) : (
+                    <div className="text-center py-4 text-black">
+                      {t("랭킹 로딩 중...", "Loading...")}
                     </div>
-                    <div className="bg-purple-50 dark:bg-gray-700 p-3 rounded-lg">
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        {t("정확도", "Accuracy")}
-                      </div>
-                      <div className="text-xl font-semibold text-gray-900 dark:text-white">
-                        {accuracy.toFixed(1)}%
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </div>
-
-                {/* Rankings */}
-                <div className="mb-6">
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 text-center">
-                    {t("베네치아 랭킹", "Venice Rankings")}
-                  </h2>
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                    {veniceRankings.length > 0 ? (
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-gray-300 dark:border-gray-600">
-                            <th className="text-left py-2 text-gray-600 dark:text-gray-400">#</th>
-                            <th className="text-left py-2 text-gray-600 dark:text-gray-400">{t("이름", "Name")}</th>
-                            <th className="text-right py-2 text-gray-600 dark:text-gray-400">{t("점수", "Score")}</th>
-                            <th className="text-right py-2 text-gray-600 dark:text-gray-400">{t("레벨", "Level")}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {veniceRankings.map((ranking: any, index: number) => (
-                            <tr key={ranking.id} className="border-b border-gray-200 dark:border-gray-600">
-                              <td className="py-2 text-gray-700 dark:text-gray-300">{index + 1}</td>
-                              <td className="py-2 text-gray-900 dark:text-white font-medium">{ranking.name}</td>
-                              <td className="py-2 text-right text-gray-900 dark:text-white">{ranking.score.toLocaleString()}</td>
-                              <td className="py-2 text-right text-gray-700 dark:text-gray-300">{ranking.extra?.level || '-'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <div className="text-center text-gray-500 dark:text-gray-400 py-4">
-                        {t("랭킹 로딩 중...", "Loading rankings...")}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Buttons */}
-                <div className="flex gap-4">
-                  <button
-                    onClick={() => {
-                      setWaitingForStart(true);
-                      setGameOver(false);
-                      setIsGameOverAnimating(false);
-                      setInputBoxFallCount(0);
-                      setVeniceRankings([]);
-                      isGameOverAnimatingRef.current = false;
-                    }}
-                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
-                  >
-                    {t("다시 하기", "Play Again")}
-                  </button>
-                  <Link
-                    to="/"
-                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 px-6 rounded-lg text-center font-semibold transition-colors"
-                  >
-                    {t("메인으로", "Home")}
-                  </Link>
-                </div>
-              </div>
+              </DosWindow>
             </div>
           )}
 
