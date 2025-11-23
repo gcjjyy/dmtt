@@ -61,6 +61,8 @@ export default function VeniceGame() {
   const [isGameOverAnimating, setIsGameOverAnimating] = useState(false);
   const [inputBoxFallCount, setInputBoxFallCount] = useState(0);
   const [veniceRankings, setVeniceRankings] = useState<any[]>([]);
+  const [totalWordsProcessed, setTotalWordsProcessed] = useState(0);
+  const [isStageTransition, setIsStageTransition] = useState(false);
 
   // fallDistance는 count로부터 계산 (중복 실행 방지)
   const inputBoxFallDistance = inputBoxFallCount * 16;
@@ -92,21 +94,30 @@ export default function VeniceGame() {
   const BRICK_TOP = GAME_HEIGHT - BRICK_HEIGHT; // 464
   const INPUT_TOP = GAME_HEIGHT - BRICK_HEIGHT - INPUT_HEIGHT; // 416
   const BASE_SPEED = 1;
+  const WORDS_PER_STAGE = 10; // 단계 상승에 필요한 단어 처리 개수 (테스트용: 10, 실제: 50)
 
-  // Spacebar handler to start game
+  // Spacebar handler to start game or resume from stage transition
   useEffect(() => {
     const handleSpace = (e: KeyboardEvent) => {
-      if (e.code === "Space" && waitingForStart && !gameStarted) {
-        e.preventDefault();
-        startGame();
+      if (e.code === "Space") {
+        // 단계 전환 중이면 재개
+        if (isStageTransition) {
+          e.preventDefault();
+          setIsStageTransition(false);
+        }
+        // 게임 시작 대기 중이면 시작
+        else if (waitingForStart && !gameStarted) {
+          e.preventDefault();
+          startGame();
+        }
       }
     };
     window.addEventListener("keydown", handleSpace);
     return () => window.removeEventListener("keydown", handleSpace);
-  }, [waitingForStart, gameStarted]);
+  }, [waitingForStart, gameStarted, isStageTransition]);
 
   useEffect(() => {
-    if (gameStarted && !gameOver && !isGameOverAnimating && !isFrozen) {
+    if (gameStarted && !gameOver && !isGameOverAnimating && !isFrozen && !isStageTransition) {
       inputRef.current?.focus();
 
       // Clear any existing interval first
@@ -117,8 +128,8 @@ export default function VeniceGame() {
       // Reset spawn counter when starting/restarting
       spawnCounterRef.current = 0;
 
-      // Game loop interval - speed increases with level
-      // Level 1: 1초, Level 8: 0.5초
+      // Game loop interval - speed increases with stage
+      // Stage 1: 1초, Stage 8: 0.5초
       // speedMultiplier로 나눠서 속도 조절 (1.5 = 빠르게, 0.5 = 느리게)
       const baseDelay = Math.max(500, 1000 - (level - 1) * (500 / 7));
       const loopDelay = baseDelay / speedMultiplier;
@@ -133,12 +144,12 @@ export default function VeniceGame() {
       };
     } else {
       // Game not started or over - clear interval
-      console.log(`🔥 [${performance.now().toFixed(2)}ms] [게임 루프 정지] gameStarted:`, gameStarted, 'gameOver:', gameOver, 'isGameOverAnimating:', isGameOverAnimating, 'isFrozen:', isFrozen);
+      console.log(`🔥 [${performance.now().toFixed(2)}ms] [게임 루프 정지] gameStarted:`, gameStarted, 'gameOver:', gameOver, 'isGameOverAnimating:', isGameOverAnimating, 'isFrozen:', isFrozen, 'isStageTransition:', isStageTransition);
       if (gameLoopIntervalRef.current) {
         clearInterval(gameLoopIntervalRef.current);
       }
     }
-  }, [gameStarted, gameOver, isGameOverAnimating, level, speedMultiplier, isFrozen]);
+  }, [gameStarted, gameOver, isGameOverAnimating, level, speedMultiplier, isFrozen, isStageTransition]);
 
   // Submit score when game is over
   useEffect(() => {
@@ -715,6 +726,23 @@ export default function VeniceGame() {
           setTimeout(() => setVirusMessage(null), 2000);
         }
 
+        // 단어 처리 카운터 증가 및 단계 상승 체크
+        if (removed.length > 0) {
+          setTotalWordsProcessed((prev) => {
+            const newTotal = prev + removed.length;
+            const currentStageWords = prev % WORDS_PER_STAGE;
+            const newStageWords = newTotal % WORDS_PER_STAGE;
+
+            // 단계 상승 조건 체크
+            if (currentStageWords < WORDS_PER_STAGE && newStageWords < currentStageWords) {
+              setLevel((prevLevel) => prevLevel + 1);
+              setIsStageTransition(true);
+            }
+
+            return newTotal;
+          });
+        }
+
         // 다음 틱에서 플래그와 캐시 리셋
         setTimeout(() => {
           isProcessingCollisionRef.current = false;
@@ -758,12 +786,20 @@ export default function VeniceGame() {
           // 일반 단어만 점수 추가
           const points = matchedWord.word.length * 10;
           setScore((prev) => prev + points);
-
-          // Level up every 500 points (일반 단어만)
-          if ((score + points) % 500 === 0) {
-            setLevel((prev) => prev + 1);
-          }
         }
+
+        // 단어 처리 카운터 증가 및 단계 상승 체크
+        setTotalWordsProcessed((prev) => {
+          const newTotal = prev + 1;
+
+          // 단계 상승 조건 체크
+          if (newTotal % WORDS_PER_STAGE === 0) {
+            setLevel((prevLevel) => prevLevel + 1);
+            setIsStageTransition(true);
+          }
+
+          return newTotal;
+        });
 
         setWordsCaught((prev) => prev + 1);
         setInputValue("");
@@ -796,6 +832,8 @@ export default function VeniceGame() {
     setInputBoxFallCount(0);
     setVeniceRankings([]);
     isGameOverAnimatingRef.current = false;
+    setTotalWordsProcessed(0);
+    setIsStageTransition(false);
 
     // AudioContext 미리 초기화 및 모든 사운드 워밍업 (딜레이 제거)
     try {
@@ -902,9 +940,9 @@ export default function VeniceGame() {
         ref={gameAreaRef}
         className="relative overflow-visible w-[800px] h-[528px]"
       >
-          {/* Score and Level Display */}
+          {/* Score and Stage Display */}
           <div className="absolute -top-2 left-1/2 bg-[#008080] transform -translate-x-1/2 text-black leading-4 z-10">
-            {t("레벨", "Level")}: {level}  {t("점수", "Score")}: {score}
+            {t("단계", "Stage")}: {level}  {t("점수", "Score")}: {score}
           </div>
 
           {/* Falling Words */}
@@ -941,6 +979,22 @@ export default function VeniceGame() {
             );
           })}
 
+          {/* Stage Transition Overlay */}
+          {isStageTransition && (
+            <div className="absolute inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+              <DosWindow title={t("단계 상승", "Stage Up")} className="w-80">
+                <div className="p-4 text-center">
+                  <div className="text-2xl font-bold text-black mb-4">
+                    {t(`단계 ${level}`, `Stage ${level}`)}
+                  </div>
+                  <div className="text-black">
+                    {t("스페이스바를 눌러 계속", "Press Space to Continue")}
+                  </div>
+                </div>
+              </DosWindow>
+            </div>
+          )}
+
           {/* Game Over Overlay with Rankings */}
           {gameOver && (
             <div className="absolute inset-0 flex items-center justify-center z-50">
@@ -968,7 +1022,7 @@ export default function VeniceGame() {
                           <div className="flex items-center gap-2 px-1 text-black border-b border-[#808080] pb-1 mb-1">
                             <div className="w-8">#</div>
                             <div className="flex-1">{t("이름", "Name")}</div>
-                            <div className="w-12 text-right">{t("단계", "Lv")}</div>
+                            <div className="w-12 text-right">{t("단계", "Stage")}</div>
                             <div className="w-24 text-right">{t("점수", "Score")}</div>
                           </div>
                           {/* Scores */}
@@ -1020,6 +1074,8 @@ export default function VeniceGame() {
                                 setWordsCaught(0);
                                 setWordsMissed(0);
                                 setGameStartTime(0);
+                                setTotalWordsProcessed(0);
+                                setIsStageTransition(false);
 
                                 // 대기 상태로
                                 setWaitingForStart(true);
