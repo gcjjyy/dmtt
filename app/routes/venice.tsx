@@ -68,7 +68,10 @@ export default function VeniceGame() {
 
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const animationRef = useRef<number | undefined>(undefined);
+  const gameLoopIntervalRef = useRef<number | undefined>(undefined);
+  const spawnCounterRef = useRef(0);
+  const isProcessingCollisionRef = useRef(false);
+  const cachedSurvivingWordsRef = useRef<FallingWord[] | null>(null);
 
   const GAME_WIDTH = 800;
   const GAME_HEIGHT = 528;
@@ -79,7 +82,6 @@ export default function VeniceGame() {
   const BRICK_TOP = GAME_HEIGHT - BRICK_HEIGHT; // 464
   const INPUT_TOP = GAME_HEIGHT - BRICK_HEIGHT - INPUT_HEIGHT; // 416
   const BASE_SPEED = 1;
-  const WORD_SPAWN_INTERVAL = 2000; // milliseconds
 
   // Spacebar handler to start game
   useEffect(() => {
@@ -97,22 +99,31 @@ export default function VeniceGame() {
     if (gameStarted && !gameOver) {
       inputRef.current?.focus();
 
-      // Spawn new words periodically
-      const spawnInterval = setInterval(() => {
-        spawnNewWord();
-      }, Math.max(1000, WORD_SPAWN_INTERVAL - level * 100));
+      // Clear any existing interval first
+      if (gameLoopIntervalRef.current) {
+        clearInterval(gameLoopIntervalRef.current);
+      }
 
-      // Step animation - speed increases with level
+      // Reset spawn counter when starting/restarting
+      spawnCounterRef.current = 0;
+
+      // Game loop interval - speed increases with level
       // Level 1: 1초, Level 8: 0.5초
-      const stepDelay = Math.max(500, 1000 - (level - 1) * (500 / 7));
-      const stepInterval = setInterval(() => {
-        updateWordPositions();
-      }, stepDelay);
+      const loopDelay = Math.max(500, 1000 - (level - 1) * (500 / 7));
+      gameLoopIntervalRef.current = setInterval(() => {
+        gameLoop();
+      }, loopDelay) as unknown as number;
 
       return () => {
-        clearInterval(spawnInterval);
-        clearInterval(stepInterval);
+        if (gameLoopIntervalRef.current) {
+          clearInterval(gameLoopIntervalRef.current);
+        }
       };
+    } else {
+      // Game not started or over - clear interval
+      if (gameLoopIntervalRef.current) {
+        clearInterval(gameLoopIntervalRef.current);
+      }
     }
   }, [gameStarted, gameOver, level]);
 
@@ -180,7 +191,7 @@ export default function VeniceGame() {
       id: nextWordIdRef.current,
       word: randomWord,
       x: Math.random() * (GAME_WIDTH - 100),
-      y: -50,
+      y: 0,
       speed: (BASE_SPEED + level * 0.2) * speedMultiplier,
       isVirus,
     };
@@ -263,7 +274,7 @@ export default function VeniceGame() {
             id: nextWordIdRef.current + i,
             word: randomWord,
             x: Math.random() * (GAME_WIDTH - 100),
-            y: -50 - i * 30,
+            y: -i * 30,
             speed: (BASE_SPEED + level * 0.2) * speedMultiplier,
           });
         }
@@ -285,62 +296,182 @@ export default function VeniceGame() {
     setTimeout(() => setVirusMessage(null), 2000);
   };
 
-  const updateWordPositions = () => {
-    if (isFrozen) return; // 마취 상태면 업데이트 안 함
+  const checkCollisions = (words: FallingWord[]): { surviving: FallingWord[]; removed: FallingWord[] } => {
+    console.log(`🔍 [checkCollisions] 시작 - 단어 수: ${words.length}, INPUT_TOP: ${INPUT_TOP}, WAVE_TOP: ${WAVE_TOP}`);
 
-    setFallingWords((prev) => {
-      let updated = prev.map((word) => ({
-        ...word,
-        y: word.y + 16, // 1초에 16px씩 이동
-      }));
+    let remaining = [...words];
+    const removed: FallingWord[] = [];
 
-      // 지뢰와 충돌 체크
-      updated = updated.filter((word) => {
-        const hitMine = mines.some(
-          (mine) =>
-            Math.abs(word.x - mine.x) < 50 && Math.abs(word.y - mine.y) < 30
-        );
-        if (hitMine) {
-          // 지뢰에 맞은 단어는 제거하고 점수 추가
-          setScore((prev) => prev + word.word.length * 5);
-          return false;
-        }
-        return true;
-      });
-
-      // 물결 또는 입력박스에 도달한 단어들
-      const reachedDangerZone = updated.filter(
-        (w) => w.y >= INPUT_TOP || w.y >= WAVE_TOP
+    // 1. 지뢰 충돌 체크
+    const beforeMineCheck = remaining.length;
+    remaining = remaining.filter((word) => {
+      const hitMine = mines.some(
+        (mine) =>
+          Math.abs(word.x - mine.x) < 50 && Math.abs(word.y - mine.y) < 30
       );
-      if (reachedDangerZone.length > 0) {
-        // 바이러스가 아니거나, 에이즈 감염 상태에서는 벽돌 감소
-        const damagingWords = reachedDangerZone.filter(
+      if (hitMine) {
+        console.log(`💣 [checkCollisions] 지뢰 충돌: ${word.word} at y=${word.y}`);
+        removed.push(word);
+        return false;
+      }
+      return true;
+    });
+    if (beforeMineCheck !== remaining.length) {
+      console.log(`💣 [checkCollisions] 지뢰 충돌로 제거: ${beforeMineCheck - remaining.length}개`);
+    }
+
+    // 2. 입력박스 충돌 체크
+    const INPUT_BOX_X = (GAME_WIDTH - 128) / 2;
+    const INPUT_BOX_WIDTH = 128;
+    const INPUT_BOX_BOTTOM = INPUT_TOP + INPUT_HEIGHT;
+    const beforeInputCheck = remaining.length;
+
+    remaining = remaining.filter((word) => {
+      const isKorean = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(word.word);
+      const wordWidth = word.word.length * (isKorean ? 16 : 8);
+
+      const verticalCollision = word.y >= INPUT_TOP && word.y < INPUT_BOX_BOTTOM;
+      const horizontalCollision = !(
+        word.x + wordWidth < INPUT_BOX_X ||
+        word.x > INPUT_BOX_X + INPUT_BOX_WIDTH
+      );
+
+      if (verticalCollision && horizontalCollision) {
+        console.log(`📦 [checkCollisions] 입력박스 충돌: ${word.word} at y=${word.y} (INPUT_TOP=${INPUT_TOP}, INPUT_BOX_BOTTOM=${INPUT_BOX_BOTTOM})`);
+        removed.push(word);
+        return false;
+      }
+      return true;
+    });
+    if (beforeInputCheck !== remaining.length) {
+      console.log(`📦 [checkCollisions] 입력박스 충돌로 제거: ${beforeInputCheck - remaining.length}개`);
+    }
+
+    // 3. 물결 도달 체크
+    const beforeWaveCheck = remaining.length;
+    remaining = remaining.filter((word) => {
+      if (word.y >= WAVE_TOP) {
+        console.log(`🌊 [checkCollisions] 물결 도달: ${word.word} at y=${word.y} (WAVE_TOP=${WAVE_TOP})`);
+        removed.push(word);
+        return false;
+      }
+      return true;
+    });
+    if (beforeWaveCheck !== remaining.length) {
+      console.log(`🌊 [checkCollisions] 물결 도달로 제거: ${beforeWaveCheck - remaining.length}개`);
+    }
+
+    console.log(`🔍 [checkCollisions] 완료 - 생존: ${remaining.length}, 제거: ${removed.length}`);
+    return { surviving: remaining, removed };
+  };
+
+  const gameLoop = () => {
+    console.log("🔄 [gameLoop] 시작");
+
+    // 마취 상태면 게임 로직 실행 안 함
+    if (isFrozen) {
+      console.log("❄️ [gameLoop] 마취 상태 - 스킵");
+      return;
+    }
+
+    // 1. 단어 생성 (카운터 기반)
+    spawnCounterRef.current += 1;
+    const spawnInterval = Math.max(2, 4 - level * 0.3); // 틱 단위
+    if (spawnCounterRef.current >= spawnInterval) {
+      spawnNewWord();
+      spawnCounterRef.current = 0;
+      console.log("✨ [gameLoop] 새 단어 생성");
+    }
+
+    // 2. 모든 단어 이동 및 충돌 체크 - 모든 처리를 updater 내부에서 수행
+    setFallingWords((prev) => {
+      // Strict Mode 중복 실행 방지 - 캐시된 결과 반환
+      if (isProcessingCollisionRef.current && cachedSurvivingWordsRef.current) {
+        console.log("⚠️ [gameLoop] 중복 실행 감지 - 캐시된 결과 반환");
+        return cachedSurvivingWordsRef.current;
+      }
+
+      console.log(`📦 [gameLoop] 이동 전 단어 수: ${prev.length}`);
+
+      // 단어 이동
+      const movedWords = prev.map((word) => ({
+        ...word,
+        y: word.y + 16,
+      }));
+      console.log(`🚀 [gameLoop] 이동 후 단어들:`, movedWords.map(w => ({ word: w.word, y: w.y, isVirus: w.isVirus })));
+
+      // 충돌 체크
+      const { surviving, removed } = checkCollisions(movedWords);
+      console.log(`✅ [gameLoop] 충돌 체크 완료 - 생존: ${surviving.length}, 제거: ${removed.length}`);
+      console.log(`❌ [gameLoop] 제거된 단어들:`, removed.map(w => ({ word: w.word, y: w.y, isVirus: w.isVirus })));
+
+      // 캐시에 저장
+      cachedSurvivingWordsRef.current = surviving;
+
+      // 3. 제거된 단어에 따른 처리
+      if (removed.length > 0) {
+        isProcessingCollisionRef.current = true;
+        console.log(`📋 [gameLoop] 제거된 단어 처리 시작: ${removed.length}개`);
+
+        // 지뢰로 제거된 단어는 점수 추가
+        const mineHits = removed.filter((word) =>
+          mines.some((mine) =>
+            Math.abs(word.x - mine.x) < 50 && Math.abs(word.y - mine.y) < 30
+          )
+        );
+        if (mineHits.length > 0) {
+          const mineScore = mineHits.reduce((sum, w) => sum + w.word.length * 5, 0);
+          setScore((prev) => prev + mineScore);
+          console.log(`💣 [gameLoop] 지뢰 맞은 단어: ${mineHits.length}개, 점수: +${mineScore}`);
+        }
+
+        // 입력박스 또는 물결에 도달한 단어는 벽돌 감소
+        const damagingWords = removed.filter(
           (w) => !w.isVirus || isAidsInfected
         );
+        console.log(`💥 [gameLoop] 데미지 주는 단어 필터링:`, {
+          removed: removed.map(w => ({ word: w.word, isVirus: w.isVirus })),
+          isAidsInfected,
+          damagingWords: damagingWords.map(w => ({ word: w.word, isVirus: w.isVirus })),
+          count: damagingWords.length
+        });
 
         if (damagingWords.length > 0) {
+          console.log(`🧱 [gameLoop] 벽돌 감소 실행! 데미지 단어 수: ${damagingWords.length}`);
           setWordsMissed((prev) => prev + damagingWords.length);
           setBricks((prevBricks) => {
             const newBricks = prevBricks - damagingWords.length;
+            console.log(`🧱 [gameLoop] setBricks - 이전: ${prevBricks}, 감소량: ${damagingWords.length}, 새 값: ${newBricks}`);
             if (newBricks <= 0) {
+              console.log("💀 [gameLoop] 게임 오버!");
               setGameOver(true);
             }
             return Math.max(0, newBricks);
           });
+        } else {
+          console.log("⚠️ [gameLoop] 바이러스만 제거됨 - 벽돌 감소 안됨");
         }
 
         // 에이즈 바이러스 체크 - 바이러스를 무시하고 보냈는지
-        const ignoredViruses = reachedDangerZone.filter((w) => w.isVirus);
+        const ignoredViruses = removed.filter((w) => w.isVirus && w.y >= WAVE_TOP);
         if (ignoredViruses.length > 0 && ignoredViruses.some((w) => w.word.includes("AIDS") || Math.random() < 0.3)) {
           setIsAidsInfected(true);
           setVirusMessage(t("에이즈 바이러스 감염!", "AIDS Infected!"));
           setTimeout(() => setVirusMessage(null), 2000);
+          console.log("☣️ [gameLoop] 에이즈 바이러스 감염!");
         }
+
+        // 다음 틱에서 플래그와 캐시 리셋
+        setTimeout(() => {
+          isProcessingCollisionRef.current = false;
+          cachedSurvivingWordsRef.current = null;
+        }, 0);
       }
 
-      // 화면에 남아있는 단어만 유지 (물결 위쪽만)
-      return updated.filter((w) => w.y < WAVE_TOP);
+      return surviving;
     });
+
+    console.log("✅ [gameLoop] 완료\n");
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -487,10 +618,10 @@ export default function VeniceGame() {
       {/* Game Area */}
       <div
         ref={gameAreaRef}
-        className="relative overflow-hidden w-[800px] h-[528px]"
+        className="relative overflow-visible w-[800px] h-[528px]"
       >
           {/* Score and Level Display */}
-          <div className="absolute top-0 left-1/2 bg-[#008080] transform -translate-x-1/2 text-black">
+          <div className="absolute -top-2 left-1/2 bg-[#008080] transform -translate-x-1/2 text-black leading-4 z-10">
             {t("레벨", "Level")}: {level}  {t("점수", "Score")}: {score}
           </div>
 
@@ -501,9 +632,9 @@ export default function VeniceGame() {
               className={`absolute transition-none ${
                 word.isVirus
                   ? "text-yellow-400 dark:text-yellow-300"
-                  : "text-gray-900 dark:text-white"
+                  : "text-black"
               }`}
-              style={{ left: word.x, top: word.y }}
+              style={{ left: word.x, top: word.y, lineHeight: '16px', height: '16px' }}
             >
               {word.isHidden ? "???" : word.word}
             </div>
@@ -542,7 +673,7 @@ export default function VeniceGame() {
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               onPaste={(e) => e.preventDefault()}
-              className="w-full h-full border-2 border-black bg-white text-gray-900 text-center focus:outline-none text-lg"
+              className="w-full h-full bg-white text-gray-900 text-center focus:outline-none text-base border border-black"
               autoComplete="off"
               spellCheck={false}
               disabled={waitingForStart || gameOver}
@@ -558,9 +689,23 @@ export default function VeniceGame() {
               {Array.from({ length: 12 }).map((_, index) => (
                 <div
                   key={index}
-                  className={`w-8 h-4 border border-black ${
-                    index < bricks ? "bg-orange-600" : "bg-gray-400"
+                  className={`w-8 h-4 relative ${
+                    index < bricks
+                      ? "bg-gradient-to-br from-sky-400 via-sky-500 to-sky-600 border-t-2 border-l-2 border-sky-100 border-r-2 border-b-2 border-r-sky-950 border-b-black shadow-md"
+                      : "bg-gradient-to-br from-gray-800 via-gray-900 to-black border-t-2 border-l-2 border-gray-700 border-r-2 border-b-2 border-r-black border-b-black shadow-inner"
                   }`}
+                  style={
+                    index < bricks
+                      ? {
+                          backgroundImage:
+                            "repeating-linear-gradient(45deg, #5eb8d9, #5eb8d9 2px, #7ec8e3 2px, #7ec8e3 4px)",
+                        }
+                      : {
+                          backgroundImage:
+                            "linear-gradient(135deg, #1a1a1a 25%, #2d2d2d 25%, #2d2d2d 50%, #1a1a1a 50%, #1a1a1a 75%, #2d2d2d 75%)",
+                          backgroundSize: "4px 4px",
+                        }
+                  }
                 />
               ))}
             </div>
