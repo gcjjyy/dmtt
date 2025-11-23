@@ -48,7 +48,7 @@ export default function VeniceGame() {
   const [gameStarted, setGameStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
-  const [bricks, setBricks] = useState(12);
+  const [bricks, setBricks] = useState(1);
   const [level, setLevel] = useState(1);
   const [waitingForStart, setWaitingForStart] = useState(true);
   const [fallingWords, setFallingWords] = useState<FallingWord[]>([]);
@@ -59,6 +59,12 @@ export default function VeniceGame() {
   const [speedMultiplier, setSpeedMultiplier] = useState(1);
   const [isAidsInfected, setIsAidsInfected] = useState(false);
   const [virusMessage, setVirusMessage] = useState<string | null>(null);
+  const [isGameOverAnimating, setIsGameOverAnimating] = useState(false);
+  const [inputBoxFallCount, setInputBoxFallCount] = useState(0);
+  const [veniceRankings, setVeniceRankings] = useState<any[]>([]);
+
+  // fallDistance는 count로부터 계산 (중복 실행 방지)
+  const inputBoxFallDistance = inputBoxFallCount * 16;
 
   // Score submission tracking
   const [sessionToken, setSessionToken] = useState<string | null>(null);
@@ -97,7 +103,7 @@ export default function VeniceGame() {
   }, [waitingForStart, gameStarted]);
 
   useEffect(() => {
-    if (gameStarted && !gameOver) {
+    if (gameStarted && !gameOver && !isGameOverAnimating) {
       inputRef.current?.focus();
 
       // Clear any existing interval first
@@ -122,11 +128,12 @@ export default function VeniceGame() {
       };
     } else {
       // Game not started or over - clear interval
+      console.log('🔥 [게임 루프 정지] gameStarted:', gameStarted, 'gameOver:', gameOver, 'isGameOverAnimating:', isGameOverAnimating);
       if (gameLoopIntervalRef.current) {
         clearInterval(gameLoopIntervalRef.current);
       }
     }
-  }, [gameStarted, gameOver, level]);
+  }, [gameStarted, gameOver, isGameOverAnimating, level]);
 
   // Submit score when game is over
   useEffect(() => {
@@ -184,6 +191,45 @@ export default function VeniceGame() {
     return () => setStatusMessage("");
   }, [waitingForStart, gameStarted, virusMessage, isFrozen, isAidsInfected, t, setStatusMessage]);
 
+  // Game over animation: input box falling
+  useEffect(() => {
+    if (isGameOverAnimating) {
+      console.log('🔥 [무너지기 시작] isGameOverAnimating = true');
+      const interval = setInterval(() => {
+        setInputBoxFallCount((prevCount) => {
+          const newCount = prevCount + 1;
+          console.log(`🔥 [무너지기 카운트] prevCount=${prevCount}, newCount=${newCount}, 거리=${newCount * 16}px`);
+
+          // 4번 무너지면 애니메이션 종료
+          if (newCount > 4) {
+            console.log('🔥 [무너지기 완료] 4번 무너짐, 랭킹 표시');
+            clearInterval(interval);
+
+            // 랭킹 데이터 fetch
+            fetch('/api/ranking?type=venice')
+              .then(res => res.json())
+              .then(data => setVeniceRankings(data.rankings || []))
+              .catch(err => console.error('Failed to fetch rankings:', err));
+
+            // 게임 오버 화면 표시
+            setGameOver(true);
+            return prevCount; // 카운트 변경 없음
+          }
+
+          // 사운드 재생
+          console.log(`🔥 [무너지기 실행] ${newCount}번째 무너짐`);
+          playGameOverSound();
+          return newCount;
+        });
+      }, 875); // 0.875초마다 (사운드 재생 시간과 동일)
+
+      return () => {
+        console.log('🔥 [무너지기 정리] interval cleared');
+        clearInterval(interval);
+      };
+    }
+  }, [isGameOverAnimating]);
+
   const spawnNewWord = () => {
     const randomWord = words[Math.floor(Math.random() * words.length)];
     const isVirus = Math.random() < 0.15; // 15% 확률로 바이러스
@@ -224,7 +270,7 @@ export default function VeniceGame() {
     applyVirusEffect(selectedEffect, x, y);
   };
 
-  const playBeep = () => {
+  const playBeep = (frequency: number, duration: number) => {
     try {
       // GWBASIC SOUND 스타일: SOUND frequency, duration
       if (!audioContextRef.current) {
@@ -238,11 +284,9 @@ export default function VeniceGame() {
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
 
-      // 낮은 비프음: 150Hz (GWBASIC의 SOUND 150, 1 스타일)
-      oscillator.frequency.value = 150;
+      oscillator.frequency.value = frequency;
       oscillator.type = 'square'; // 레트로한 사각파
 
-      const duration = 0.075; // 75ms
       gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
       gainNode.gain.setValueAtTime(0.2, audioContext.currentTime + duration * 0.85); // flat하게 유지
       gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
@@ -251,6 +295,97 @@ export default function VeniceGame() {
       oscillator.stop(audioContext.currentTime + duration);
     } catch (e) {
       console.error('Failed to play beep:', e);
+    }
+  };
+
+  const playCatchSound = () => {
+    try {
+      // 단어 제거 시: 250Hz 0.1초 → 500Hz 0.1초
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+
+      const audioContext = audioContextRef.current;
+
+      // 첫 번째 음: 250Hz, 0.1초
+      const osc1 = audioContext.createOscillator();
+      const gain1 = audioContext.createGain();
+      osc1.connect(gain1);
+      gain1.connect(audioContext.destination);
+      osc1.frequency.value = 250;
+      osc1.type = 'square';
+      gain1.gain.setValueAtTime(0.2, audioContext.currentTime);
+      gain1.gain.setValueAtTime(0.2, audioContext.currentTime + 0.1 * 0.85);
+      gain1.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+      osc1.start(audioContext.currentTime);
+      osc1.stop(audioContext.currentTime + 0.1);
+
+      // 두 번째 음: 500Hz, 0.1초
+      const osc2 = audioContext.createOscillator();
+      const gain2 = audioContext.createGain();
+      osc2.connect(gain2);
+      gain2.connect(audioContext.destination);
+      osc2.frequency.value = 500;
+      osc2.type = 'square';
+      gain2.gain.setValueAtTime(0.2, audioContext.currentTime + 0.1);
+      gain2.gain.setValueAtTime(0.2, audioContext.currentTime + 0.1 + 0.1 * 0.85);
+      gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+      osc2.start(audioContext.currentTime + 0.1);
+      osc2.stop(audioContext.currentTime + 0.2);
+    } catch (e) {
+      console.error('Failed to play catch sound:', e);
+    }
+  };
+
+  const playGameOverSound = () => {
+    try {
+      // 게임 오버 시: 200Hz 0.25초 → 600Hz 0.25초 → 400Hz 0.375초
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+
+      const audioContext = audioContextRef.current;
+
+      // 첫 번째 음: 200Hz, 0.25초
+      const osc1 = audioContext.createOscillator();
+      const gain1 = audioContext.createGain();
+      osc1.connect(gain1);
+      gain1.connect(audioContext.destination);
+      osc1.frequency.value = 200;
+      osc1.type = 'square';
+      gain1.gain.setValueAtTime(0.2, audioContext.currentTime);
+      gain1.gain.setValueAtTime(0.2, audioContext.currentTime + 0.25 * 0.85);
+      gain1.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.25);
+      osc1.start(audioContext.currentTime);
+      osc1.stop(audioContext.currentTime + 0.25);
+
+      // 두 번째 음: 600Hz, 0.25초
+      const osc2 = audioContext.createOscillator();
+      const gain2 = audioContext.createGain();
+      osc2.connect(gain2);
+      gain2.connect(audioContext.destination);
+      osc2.frequency.value = 600;
+      osc2.type = 'square';
+      gain2.gain.setValueAtTime(0.2, audioContext.currentTime + 0.25);
+      gain2.gain.setValueAtTime(0.2, audioContext.currentTime + 0.25 + 0.25 * 0.85);
+      gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+      osc2.start(audioContext.currentTime + 0.25);
+      osc2.stop(audioContext.currentTime + 0.5);
+
+      // 세 번째 음: 400Hz, 0.375초 (1.5배)
+      const osc3 = audioContext.createOscillator();
+      const gain3 = audioContext.createGain();
+      osc3.connect(gain3);
+      gain3.connect(audioContext.destination);
+      osc3.frequency.value = 400;
+      osc3.type = 'square';
+      gain3.gain.setValueAtTime(0.2, audioContext.currentTime + 0.5);
+      gain3.gain.setValueAtTime(0.2, audioContext.currentTime + 0.5 + 0.375 * 0.85);
+      gain3.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.875);
+      osc3.start(audioContext.currentTime + 0.5);
+      osc3.stop(audioContext.currentTime + 0.875);
+    } catch (e) {
+      console.error('Failed to play game over sound:', e);
     }
   };
 
@@ -328,34 +463,26 @@ export default function VeniceGame() {
   };
 
   const checkCollisions = (words: FallingWord[]): { surviving: FallingWord[]; removed: FallingWord[] } => {
-    console.log(`🔍 [checkCollisions] 시작 - 단어 수: ${words.length}, INPUT_TOP: ${INPUT_TOP}, WAVE_TOP: ${WAVE_TOP}`);
-
     let remaining = [...words];
     const removed: FallingWord[] = [];
 
     // 1. 지뢰 충돌 체크
-    const beforeMineCheck = remaining.length;
     remaining = remaining.filter((word) => {
       const hitMine = mines.some(
         (mine) =>
           Math.abs(word.x - mine.x) < 50 && Math.abs(word.y - mine.y) < 30
       );
       if (hitMine) {
-        console.log(`💣 [checkCollisions] 지뢰 충돌: ${word.word} at y=${word.y}`);
         removed.push(word);
         return false;
       }
       return true;
     });
-    if (beforeMineCheck !== remaining.length) {
-      console.log(`💣 [checkCollisions] 지뢰 충돌로 제거: ${beforeMineCheck - remaining.length}개`);
-    }
 
     // 2. 입력박스 충돌 체크
     const INPUT_BOX_X = (GAME_WIDTH - 128) / 2;
     const INPUT_BOX_WIDTH = 128;
     const INPUT_BOX_BOTTOM = INPUT_TOP + INPUT_HEIGHT;
-    const beforeInputCheck = remaining.length;
 
     remaining = remaining.filter((word) => {
       const isKorean = /[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(word.word);
@@ -368,40 +495,27 @@ export default function VeniceGame() {
       );
 
       if (verticalCollision && horizontalCollision) {
-        console.log(`📦 [checkCollisions] 입력박스 충돌: ${word.word} at y=${word.y} (INPUT_TOP=${INPUT_TOP}, INPUT_BOX_BOTTOM=${INPUT_BOX_BOTTOM})`);
         removed.push(word);
         return false;
       }
       return true;
     });
-    if (beforeInputCheck !== remaining.length) {
-      console.log(`📦 [checkCollisions] 입력박스 충돌로 제거: ${beforeInputCheck - remaining.length}개`);
-    }
 
     // 3. 물결 도달 체크
-    const beforeWaveCheck = remaining.length;
     remaining = remaining.filter((word) => {
       if (word.y >= WAVE_TOP) {
-        console.log(`🌊 [checkCollisions] 물결 도달: ${word.word} at y=${word.y} (WAVE_TOP=${WAVE_TOP})`);
         removed.push(word);
         return false;
       }
       return true;
     });
-    if (beforeWaveCheck !== remaining.length) {
-      console.log(`🌊 [checkCollisions] 물결 도달로 제거: ${beforeWaveCheck - remaining.length}개`);
-    }
 
-    console.log(`🔍 [checkCollisions] 완료 - 생존: ${remaining.length}, 제거: ${removed.length}`);
     return { surviving: remaining, removed };
   };
 
   const gameLoop = () => {
-    console.log("🔄 [gameLoop] 시작");
-
     // 마취 상태면 게임 로직 실행 안 함
     if (isFrozen) {
-      console.log("❄️ [gameLoop] 마취 상태 - 스킵");
       return;
     }
 
@@ -411,30 +525,23 @@ export default function VeniceGame() {
     if (spawnCounterRef.current >= spawnInterval) {
       spawnNewWord();
       spawnCounterRef.current = 0;
-      console.log("✨ [gameLoop] 새 단어 생성");
     }
 
     // 2. 모든 단어 이동 및 충돌 체크 - 모든 처리를 updater 내부에서 수행
     setFallingWords((prev) => {
       // Strict Mode 중복 실행 방지 - 캐시된 결과 반환
       if (isProcessingCollisionRef.current && cachedSurvivingWordsRef.current) {
-        console.log("⚠️ [gameLoop] 중복 실행 감지 - 캐시된 결과 반환");
         return cachedSurvivingWordsRef.current;
       }
-
-      console.log(`📦 [gameLoop] 이동 전 단어 수: ${prev.length}`);
 
       // 단어 이동
       const movedWords = prev.map((word) => ({
         ...word,
         y: word.y + 16,
       }));
-      console.log(`🚀 [gameLoop] 이동 후 단어들:`, movedWords.map(w => ({ word: w.word, y: w.y, isVirus: w.isVirus })));
 
       // 충돌 체크
       const { surviving, removed } = checkCollisions(movedWords);
-      console.log(`✅ [gameLoop] 충돌 체크 완료 - 생존: ${surviving.length}, 제거: ${removed.length}`);
-      console.log(`❌ [gameLoop] 제거된 단어들:`, removed.map(w => ({ word: w.word, y: w.y, isVirus: w.isVirus })));
 
       // 캐시에 저장
       cachedSurvivingWordsRef.current = surviving;
@@ -442,10 +549,9 @@ export default function VeniceGame() {
       // 3. 제거된 단어에 따른 처리
       if (removed.length > 0) {
         isProcessingCollisionRef.current = true;
-        console.log(`📋 [gameLoop] 제거된 단어 처리 시작: ${removed.length}개`);
 
-        // 단어가 떨어질 때마다 비프음
-        playBeep();
+        // 단어가 떨어질 때마다 비프음 (250Hz, 0.125초)
+        playBeep(250, 0.125);
 
         // 지뢰로 제거된 단어는 점수 추가
         const mineHits = removed.filter((word) =>
@@ -456,34 +562,24 @@ export default function VeniceGame() {
         if (mineHits.length > 0) {
           const mineScore = mineHits.reduce((sum, w) => sum + w.word.length * 5, 0);
           setScore((prev) => prev + mineScore);
-          console.log(`💣 [gameLoop] 지뢰 맞은 단어: ${mineHits.length}개, 점수: +${mineScore}`);
         }
 
         // 입력박스 또는 물결에 도달한 단어는 벽돌 감소
         const damagingWords = removed.filter(
           (w) => !w.isVirus || isAidsInfected
         );
-        console.log(`💥 [gameLoop] 데미지 주는 단어 필터링:`, {
-          removed: removed.map(w => ({ word: w.word, isVirus: w.isVirus })),
-          isAidsInfected,
-          damagingWords: damagingWords.map(w => ({ word: w.word, isVirus: w.isVirus })),
-          count: damagingWords.length
-        });
 
         if (damagingWords.length > 0) {
-          console.log(`🧱 [gameLoop] 벽돌 감소 실행! 데미지 단어 수: ${damagingWords.length}`);
           setWordsMissed((prev) => prev + damagingWords.length);
           setBricks((prevBricks) => {
             const newBricks = prevBricks - damagingWords.length;
-            console.log(`🧱 [gameLoop] setBricks - 이전: ${prevBricks}, 감소량: ${damagingWords.length}, 새 값: ${newBricks}`);
+            console.log(`🔥 [생명 변경] 이전 생명: ${prevBricks}, 데미지: ${damagingWords.length}, 새 생명: ${newBricks}`);
             if (newBricks <= 0) {
-              console.log("💀 [gameLoop] 게임 오버!");
-              setGameOver(true);
+              console.log("🔥 [게임 오버 트리거] 생명 0 이하, 무너지기 시작!");
+              setIsGameOverAnimating(true);
             }
             return Math.max(0, newBricks);
           });
-        } else {
-          console.log("⚠️ [gameLoop] 바이러스만 제거됨 - 벽돌 감소 안됨");
         }
 
         // 에이즈 바이러스 체크 - 바이러스를 무시하고 보냈는지
@@ -492,7 +588,6 @@ export default function VeniceGame() {
           setIsAidsInfected(true);
           setVirusMessage(t("에이즈 바이러스 감염!", "AIDS Infected!"));
           setTimeout(() => setVirusMessage(null), 2000);
-          console.log("☣️ [gameLoop] 에이즈 바이러스 감염!");
         }
 
         // 다음 틱에서 플래그와 캐시 리셋
@@ -504,8 +599,6 @@ export default function VeniceGame() {
 
       return surviving;
     });
-
-    console.log("✅ [gameLoop] 완료\n");
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -529,6 +622,9 @@ export default function VeniceGame() {
       if (matchedWord) {
         // Remove the matched word
         setFallingWords((prev) => prev.filter((w) => w.id !== matchedWord.id));
+
+        // 단어 제거 성공 사운드 (250Hz 0.25초 → 500Hz 0.25초)
+        playCatchSound();
 
         // 바이러스 단어인 경우 효과 발동
         if (matchedWord.isVirus) {
@@ -554,7 +650,7 @@ export default function VeniceGame() {
     setGameStarted(true);
     setGameOver(false);
     setScore(0);
-    setBricks(12);
+    setBricks(1);
     setLevel(1);
     setFallingWords([]);
     setInputValue("");
@@ -568,6 +664,9 @@ export default function VeniceGame() {
     setWordsMissed(0);
     setGameStartTime(Date.now());
     setWaitingForStart(false);
+    setIsGameOverAnimating(false);
+    setInputBoxFallCount(0);
+    setVeniceRankings([]);
 
     // AudioContext 미리 초기화 (딜레이 제거)
     try {
@@ -577,6 +676,16 @@ export default function VeniceGame() {
       if (audioContextRef.current.state === 'suspended') {
         await audioContextRef.current.resume();
       }
+
+      // 무음 오실레이터로 AudioContext 워밍업 (게임 오버 사운드 딜레이 제거)
+      const audioContext = audioContextRef.current;
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      gainNode.gain.value = 0; // 무음
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.001); // 1ms
     } catch (err) {
       console.error("Failed to initialize audio:", err);
     }
@@ -598,66 +707,6 @@ export default function VeniceGame() {
   };
 
   const accuracy = score > 0 ? Math.min(100, (score / (score + bricks * 100)) * 100) : 100;
-
-  if (gameOver) {
-    return (
-      <div className="p-8">
-        <div className="w-full">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-xl">
-            <h1 className="text-center mb-8 text-gray-900 dark:text-white">
-              {t("게임 오버!", "Game Over!")}
-            </h1>
-
-            <div className="text-center mb-8">
-              <div className="text-purple-600 dark:text-purple-400 mb-4">
-                {score.toLocaleString()}
-              </div>
-              <div className="text-gray-600 dark:text-gray-400">
-                {t("점수", "Score")}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mb-8">
-              <div className="bg-purple-50 dark:bg-gray-700 p-4 rounded-lg">
-                <div className="text-gray-600 dark:text-gray-400">
-                  {t("레벨", "Level")}
-                </div>
-                <div className="text-gray-900 dark:text-white">
-                  {level}
-                </div>
-              </div>
-              <div className="bg-purple-50 dark:bg-gray-700 p-4 rounded-lg">
-                <div className="text-gray-600 dark:text-gray-400">
-                  {t("정확도", "Accuracy")}
-                </div>
-                <div className="text-gray-900 dark:text-white">
-                  {accuracy.toFixed(1)}%
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <button
-                onClick={() => {
-                  setWaitingForStart(true);
-                  setGameOver(false);
-                }}
-                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-lg"
-              >
-                {t("다시 하기", "Play Again")}
-              </button>
-              <Link
-                to="/"
-                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 px-6 rounded-lg text-center"
-              >
-                {t("메인으로", "Home")}
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="w-full h-full bg-[#008080] flex flex-col items-center justify-end">
@@ -700,17 +749,112 @@ export default function VeniceGame() {
             </div>
           ))}
 
-          {/* Game Over Overlay */}
+          {/* Game Over Overlay with Rankings */}
           {gameOver && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <div className="text-white">{t("게임 오버", "GAME OVER")}</div>
+            <div className="absolute inset-0 flex items-center justify-center z-50">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-xl max-w-2xl w-full max-h-[90%] overflow-y-auto">
+                <h1 className="text-center mb-6 text-2xl font-bold text-gray-900 dark:text-white">
+                  {t("게임 오버!", "Game Over!")}
+                </h1>
+
+                {/* Current Score */}
+                <div className="text-center mb-6 pb-6 border-b border-gray-300 dark:border-gray-600">
+                  <div className="text-4xl font-bold text-purple-600 dark:text-purple-400 mb-2">
+                    {score.toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {t("점수", "Score")}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div className="bg-purple-50 dark:bg-gray-700 p-3 rounded-lg">
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        {t("레벨", "Level")}
+                      </div>
+                      <div className="text-xl font-semibold text-gray-900 dark:text-white">
+                        {level}
+                      </div>
+                    </div>
+                    <div className="bg-purple-50 dark:bg-gray-700 p-3 rounded-lg">
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        {t("정확도", "Accuracy")}
+                      </div>
+                      <div className="text-xl font-semibold text-gray-900 dark:text-white">
+                        {accuracy.toFixed(1)}%
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Rankings */}
+                <div className="mb-6">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 text-center">
+                    {t("베네치아 랭킹", "Venice Rankings")}
+                  </h2>
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                    {veniceRankings.length > 0 ? (
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-300 dark:border-gray-600">
+                            <th className="text-left py-2 text-gray-600 dark:text-gray-400">#</th>
+                            <th className="text-left py-2 text-gray-600 dark:text-gray-400">{t("이름", "Name")}</th>
+                            <th className="text-right py-2 text-gray-600 dark:text-gray-400">{t("점수", "Score")}</th>
+                            <th className="text-right py-2 text-gray-600 dark:text-gray-400">{t("레벨", "Level")}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {veniceRankings.map((ranking: any, index: number) => (
+                            <tr key={ranking.id} className="border-b border-gray-200 dark:border-gray-600">
+                              <td className="py-2 text-gray-700 dark:text-gray-300">{index + 1}</td>
+                              <td className="py-2 text-gray-900 dark:text-white font-medium">{ranking.name}</td>
+                              <td className="py-2 text-right text-gray-900 dark:text-white">{ranking.score.toLocaleString()}</td>
+                              <td className="py-2 text-right text-gray-700 dark:text-gray-300">{ranking.extra?.level || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div className="text-center text-gray-500 dark:text-gray-400 py-4">
+                        {t("랭킹 로딩 중...", "Loading rankings...")}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Buttons */}
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => {
+                      setWaitingForStart(true);
+                      setGameOver(false);
+                      setIsGameOverAnimating(false);
+                      setInputBoxFallCount(0);
+                      setVeniceRankings([]);
+                    }}
+                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
+                  >
+                    {t("다시 하기", "Play Again")}
+                  </button>
+                  <Link
+                    to="/"
+                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-3 px-6 rounded-lg text-center font-semibold transition-colors"
+                  >
+                    {t("메인으로", "Home")}
+                  </Link>
+                </div>
+              </div>
             </div>
           )}
 
           {/* Input Box (inside game area) */}
           <div
             className="absolute left-1/2 transform -translate-x-1/2"
-            style={{ bottom: `${BRICK_HEIGHT}px`, height: `${INPUT_HEIGHT}px`, width: '128px' }}
+            style={{
+              ...(isGameOverAnimating
+                ? { top: `${INPUT_TOP + inputBoxFallDistance}px` }
+                : { bottom: `${BRICK_HEIGHT}px` }),
+              height: `${INPUT_HEIGHT}px`,
+              width: '128px'
+            }}
           >
             <input
               ref={inputRef}

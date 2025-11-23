@@ -14,4 +14,5 @@ export default [
   ]),
   route("api/practice/start", "routes/api/practice.start.ts"),
   route("api/score/submit", "routes/api/score.submit.ts"),
+  route("api/ranking", "routes/api/ranking.ts"),
 ] satisfies RouteConfig;
