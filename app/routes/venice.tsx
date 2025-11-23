@@ -55,6 +55,7 @@ export default function VeniceGame() {
   const [isFrozen, setIsFrozen] = useState(false);
   const [speedMultiplier, setSpeedMultiplier] = useState(1);
   const [isAidsInfected, setIsAidsInfected] = useState(false);
+  const [isHideActive, setIsHideActive] = useState(false);
   const [virusMessage, setVirusMessage] = useState<string | null>(null);
   const [isGameOverAnimating, setIsGameOverAnimating] = useState(false);
   const [inputBoxFallCount, setInputBoxFallCount] = useState(0);
@@ -78,6 +79,7 @@ export default function VeniceGame() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const isGameOverAnimatingRef = useRef(false);
   const fallCountRef = useRef(0);
+  const isHideActiveRef = useRef(false);
 
   const GAME_WIDTH = 800;
   const GAME_HEIGHT = 528;
@@ -102,7 +104,7 @@ export default function VeniceGame() {
   }, [waitingForStart, gameStarted]);
 
   useEffect(() => {
-    if (gameStarted && !gameOver && !isGameOverAnimating) {
+    if (gameStarted && !gameOver && !isGameOverAnimating && !isFrozen) {
       inputRef.current?.focus();
 
       // Clear any existing interval first
@@ -129,12 +131,12 @@ export default function VeniceGame() {
       };
     } else {
       // Game not started or over - clear interval
-      console.log(`🔥 [${performance.now().toFixed(2)}ms] [게임 루프 정지] gameStarted:`, gameStarted, 'gameOver:', gameOver, 'isGameOverAnimating:', isGameOverAnimating);
+      console.log(`🔥 [${performance.now().toFixed(2)}ms] [게임 루프 정지] gameStarted:`, gameStarted, 'gameOver:', gameOver, 'isGameOverAnimating:', isGameOverAnimating, 'isFrozen:', isFrozen);
       if (gameLoopIntervalRef.current) {
         clearInterval(gameLoopIntervalRef.current);
       }
     }
-  }, [gameStarted, gameOver, isGameOverAnimating, level, speedMultiplier]);
+  }, [gameStarted, gameOver, isGameOverAnimating, level, speedMultiplier, isFrozen]);
 
   // Submit score when game is over
   useEffect(() => {
@@ -180,10 +182,6 @@ export default function VeniceGame() {
       message = t("스페이스바를 눌러 시작하세요", "Press Space to Start");
     } else if (virusMessage) {
       message = virusMessage;
-    } else if (isFrozen) {
-      message = `❄️ ${t("마취 상태", "Frozen")}`;
-    } else if (isAidsInfected) {
-      message = `⚠️ ${t("에이즈 감염 상태", "AIDS Infected")}`;
     }
 
     setStatusMessage(message);
@@ -258,7 +256,7 @@ export default function VeniceGame() {
 
   const spawnNewWord = () => {
     const randomWord = words[Math.floor(Math.random() * words.length)];
-    // 테스트: 4번째 단어(id=3)를 지뢰 바이러스로 강제
+    // 테스트: 4번째 단어(id=3)를 숨바꼭질 바이러스로 강제
     const isVirus = nextWordIdRef.current === 3 ? true : Math.random() < 0.15;
 
     // 단어 너비 계산
@@ -277,8 +275,9 @@ export default function VeniceGame() {
       y: 0,
       speed: (BASE_SPEED + level * 0.2) * speedMultiplier,
       isVirus,
-      // 테스트: 4번째 단어는 강제로 mine 효과
-      forcedEffect: nextWordIdRef.current === 3 ? "mine" : undefined,
+      isHidden: isHideActiveRef.current,
+      // 테스트: 4번째 단어는 강제로 hide 효과
+      forcedEffect: nextWordIdRef.current === 3 ? "hide" : undefined,
     };
 
     nextWordIdRef.current += 1;
@@ -471,7 +470,7 @@ export default function VeniceGame() {
       case "freeze":
         setVirusMessage(t("마취 바이러스!", "Freeze Virus!"));
         setIsFrozen(true);
-        setTimeout(() => setIsFrozen(false), 3000);
+        setTimeout(() => setIsFrozen(false), 5000);
         break;
 
       case "heal":
@@ -493,14 +492,18 @@ export default function VeniceGame() {
 
       case "hide":
         setVirusMessage(t("숨바꼭질 바이러스!", "Hide Virus!"));
+        setIsHideActive(true);
+        isHideActiveRef.current = true;
         setFallingWords((prev) =>
           prev.map((w) => ({ ...w, isHidden: true }))
         );
         setTimeout(() => {
+          setIsHideActive(false);
+          isHideActiveRef.current = false;
           setFallingWords((prev) =>
             prev.map((w) => ({ ...w, isHidden: false }))
           );
-        }, 4000);
+        }, 10000);
         break;
 
       case "flood":
@@ -783,6 +786,7 @@ export default function VeniceGame() {
     setIsFrozen(false);
     setSpeedMultiplier(1);
     setIsAidsInfected(false);
+    setIsHideActive(false);
     setVirusMessage(null);
     setWordsCaught(0);
     setWordsMissed(0);
@@ -904,19 +908,38 @@ export default function VeniceGame() {
           </div>
 
           {/* Falling Words */}
-          {fallingWords.map((word) => (
-            <div
-              key={word.id}
-              className={`absolute transition-none ${
-                word.isVirus
-                  ? "text-yellow-400 dark:text-yellow-300"
-                  : "text-black"
-              }`}
-              style={{ left: word.x, top: word.y, lineHeight: '16px', height: '16px' }}
-            >
-              {word.isHidden ? "???" : word.word}
-            </div>
-          ))}
+          {fallingWords.map((word) => {
+            if (word.isHidden) {
+              const wordWidth = getWordWidth(word.word);
+              return (
+                <div
+                  key={word.id}
+                  className="absolute"
+                  style={{
+                    left: word.x,
+                    top: word.y,
+                    width: `${wordWidth}px`,
+                    height: '16px',
+                    backgroundImage: "repeating-linear-gradient(45deg, #1a1a1a, #1a1a1a 2px, #2d2d2d 2px, #2d2d2d 4px)",
+                    backgroundSize: "4px 4px"
+                  }}
+                />
+              );
+            }
+            return (
+              <div
+                key={word.id}
+                className={`absolute transition-none ${
+                  word.isVirus
+                    ? "text-yellow-400 dark:text-yellow-300"
+                    : "text-black"
+                }`}
+                style={{ left: word.x, top: word.y, lineHeight: '16px', height: '16px' }}
+              >
+                {word.word}
+              </div>
+            );
+          })}
 
           {/* Game Over Overlay with Rankings */}
           {gameOver && (
@@ -989,6 +1012,7 @@ export default function VeniceGame() {
                                 setIsFrozen(false);
                                 setSpeedMultiplier(1);
                                 setIsAidsInfected(false);
+                                setIsHideActive(false);
                                 setVirusMessage(null);
                                 setWordsCaught(0);
                                 setWordsMissed(0);
