@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLanguage } from "~/contexts/LanguageContext";
 import { DosWindow } from "~/components/DosWindow";
 
-type Topic = "short" | "long" | "venice" | "rankings" | "settings";
+type Topic = "short" | "long" | "venice" | "rankings" | "settings" | "credits";
 
 export default function Help() {
   const { t } = useLanguage();
@@ -14,6 +14,7 @@ export default function Help() {
     { id: "venice", title: "베네치아 게임", titleEn: "Venice Game" },
     { id: "rankings", title: "랭킹", titleEn: "Rankings" },
     { id: "settings", title: "환경설정", titleEn: "Settings" },
+    { id: "credits", title: "제작자", titleEn: "Credits" },
   ];
 
   const content: Record<Topic, { ko: string; en: string }> = {
@@ -36,6 +37,10 @@ export default function Help() {
     settings: {
       ko: "사용자명을 변경하고 연습 언어(한글/영어)를 선택할 수 있습니다.",
       en: "Change your username and select practice language (Korean/English).",
+    },
+    credits: {
+      ko: "제작자: QuickBASIC\n이메일: gcjjyy@gmail.com\n\n도움주신 분들:\n- 하늘소\n- 피시키드",
+      en: "Creator: QuickBASIC\nEmail: gcjjyy@gmail.com\n\nContributors:\n- Hanulso\n- PC Kid",
     },
   };
 
@@ -62,7 +67,7 @@ export default function Help() {
           </div>
 
           {/* Right Column - Content (2/3) */}
-          <div className="w-2/3 p-4 text-black">
+          <div className="w-2/3 p-4 text-black whitespace-pre-line">
             {t(content[selectedTopic].ko, content[selectedTopic].en)}
           </div>
         </div>

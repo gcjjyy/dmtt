@@ -1,4 +1,3 @@
-import { useState, useEffect, useRef } from "react";
 import type { Route } from "./+types/home";
 import { Link, useLoaderData } from "react-router";
 import { useLanguage } from "~/contexts/LanguageContext";
@@ -71,87 +70,6 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-function AnalogClock() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [time, setTime] = useState(new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const size = 56;
-    const center = size / 2;
-    const radius = center - 2;
-
-    // Disable anti-aliasing
-    ctx.imageSmoothingEnabled = false;
-
-    // Clear
-    ctx.fillStyle = "#FFFF00";
-    ctx.fillRect(0, 0, size, size);
-
-    // Hour marks (dots)
-    for (let i = 0; i < 12; i++) {
-      const angle = (i * Math.PI) / 6 - Math.PI / 2;
-      const x = center + Math.cos(angle) * (radius - 2);
-      const y = center + Math.sin(angle) * (radius - 2);
-      ctx.fillStyle = "#000";
-      ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
-    }
-
-    const hours = time.getHours() % 12;
-    const minutes = time.getMinutes();
-    const seconds = time.getSeconds();
-
-    // Hour hand
-    const hourAngle = ((hours + minutes / 60) * Math.PI) / 6 - Math.PI / 2;
-    ctx.beginPath();
-    ctx.moveTo(center, center);
-    ctx.lineTo(center + Math.cos(hourAngle) * (radius * 0.5), center + Math.sin(hourAngle) * (radius * 0.5));
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // Minute hand
-    const minuteAngle = ((minutes + seconds / 60) * Math.PI) / 30 - Math.PI / 2;
-    ctx.beginPath();
-    ctx.moveTo(center, center);
-    ctx.lineTo(center + Math.cos(minuteAngle) * (radius * 0.7), center + Math.sin(minuteAngle) * (radius * 0.7));
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    // Second hand
-    const secondAngle = (seconds * Math.PI) / 30 - Math.PI / 2;
-    ctx.beginPath();
-    ctx.moveTo(center, center);
-    ctx.lineTo(center + Math.cos(secondAngle) * (radius * 0.8), center + Math.sin(secondAngle) * (radius * 0.8));
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-
-    // Center dot
-    ctx.fillStyle = "#000";
-    ctx.fillRect(center - 1, center - 1, 2, 2);
-  }, [time]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      width={56}
-      height={56}
-      className="border-l border-b border-black"
-    />
-  );
-}
-
 export default function Home() {
   const { t } = useLanguage();
   const { rankings } = useLoaderData<typeof loader>();
@@ -170,11 +88,6 @@ export default function Home() {
 
   return (
     <div className="w-full h-full bg-[#008080] px-4 pb-4 pt-11 relative flex flex-col">
-      {/* Analog Clock */}
-      <div className="absolute -top-[20px] right-0 z-20">
-        <AnalogClock />
-      </div>
-
       {/* Title */}
       <div className="text-center text-white mb-4">
         {t(`이번 달(${monthNames.ko[currentMonth - 1]}) 랭킹`, `This Month (${monthNames.en[currentMonth - 1]}) Rankings`)}

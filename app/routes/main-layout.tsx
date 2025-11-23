@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Outlet, useNavigate } from "react-router";
+import { Outlet, useNavigate, useLocation } from "react-router";
 import { useLanguage } from "~/contexts/LanguageContext";
 import { useGameStatus } from "~/contexts/GameStatusContext";
 
@@ -14,11 +14,14 @@ type MenuKey = "home" | "dmtt" | "practice" | "game" | "ranking" | null;
 export default function MainLayout() {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const { statusMessage } = useGameStatus();
   const [openMenu, setOpenMenu] = useState<MenuKey>(null);
   const [username, setUsername] = useState("");
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const menuBarRef = useRef<HTMLDivElement>(null);
+
+  const isHomePage = location.pathname === '/';
 
   // Load username from localStorage
   useEffect(() => {
@@ -26,13 +29,17 @@ export default function MainLayout() {
     setUsername(savedUsername);
   }, []);
 
-  // Update time every second
+  // Update time every second (클라이언트에서만 실행)
   useEffect(() => {
+    // 클라이언트에서만 시간 초기화
+    setCurrentTime(new Date());
+
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const formatTime = (date: Date) => {
+  const formatTime = (date: Date | null) => {
+    if (!date) return '--:--:--'; // SSR 기본값
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
     const seconds = date.getSeconds().toString().padStart(2, '0');
@@ -157,7 +164,7 @@ export default function MainLayout() {
 
         {/* Status Bar */}
         <div className="h-5 bg-white text-black border-t border-black flex items-center px-2 justify-between">
-          <span>{statusMessage}</span>
+          <span>{isHomePage ? '(C) 2025 QuickBASIC (gcjjyy@gmail.com)' : statusMessage}</span>
           <span>{formatTime(currentTime)}</span>
         </div>
       </div>

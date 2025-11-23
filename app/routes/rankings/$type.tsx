@@ -229,7 +229,9 @@ export default function Rankings() {
               <div className="w-20 text-black text-right">
                 {type === "short" || type === "long" ? t("타수", "CPM") : t("점수", "Score")}
               </div>
-              <div className="w-20 text-black text-right">{t("정확도", "Accuracy")}</div>
+              {type !== "venice" && (
+                <div className="w-20 text-black text-right">{t("정확도", "Accuracy")}</div>
+              )}
 
               {/* Mode-specific columns */}
               {type === "short" && (
@@ -248,11 +250,7 @@ export default function Rankings() {
               )}
 
               {type === "venice" && (
-                <>
-                  <div className="w-16 text-black text-right">{t("레벨", "Level")}</div>
-                  <div className="w-20 text-black text-right">{t("성공", "Caught")}</div>
-                  <div className="w-20 text-black text-right">{t("실패", "Missed")}</div>
-                </>
+                <div className="w-16 text-black text-right">{t("단계", "Stage")}</div>
               )}
 
               <div className="w-20 text-black text-right">{t("날짜", "Date")}</div>
@@ -269,9 +267,11 @@ export default function Rankings() {
                 <div className="w-12">{index + 1}</div>
                 <div className="flex-1 truncate">{score.name}</div>
                 <div className="w-20 text-right">{score.score.toLocaleString()}</div>
-                <div className="w-20 text-right">
-                  {score.extra?.accuracy ? `${score.extra.accuracy.toFixed(1)}%` : "-"}
-                </div>
+                {type !== "venice" && (
+                  <div className="w-20 text-right">
+                    {score.extra?.accuracy ? `${score.extra.accuracy.toFixed(1)}%` : "-"}
+                  </div>
+                )}
 
                 {/* Mode-specific columns */}
                 {type === "short" && (
@@ -300,17 +300,9 @@ export default function Rankings() {
                 )}
 
                 {type === "venice" && (
-                  <>
-                    <div className="w-16 text-right">
-                      {score.extra?.level || "-"}
-                    </div>
-                    <div className="w-20 text-right">
-                      {score.extra?.wordsCaught || "-"}
-                    </div>
-                    <div className="w-20 text-right">
-                      {score.extra?.wordsMissed || "-"}
-                    </div>
-                  </>
+                  <div className="w-16 text-right">
+                    {score.extra?.level || "-"}
+                  </div>
                 )}
 
                 <div className="w-20 text-right">{formatDate(score.created_at)}</div>

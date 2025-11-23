@@ -165,9 +165,11 @@ export default function VeniceGame() {
       spawnCounterRef.current = 0;
 
       // Game loop interval - speed increases with stage
-      // Stage 1: 1초, Stage 8: 0.5초
+      // Stage 1: 600ms, Stage 8: 250ms, 9단계 이후: 10ms씩 감소 (최소 200ms)
       // speedMultiplier로 나눠서 속도 조절 (1.5 = 빠르게, 0.5 = 느리게)
-      const baseDelay = Math.max(500, 1000 - (level - 1) * (500 / 7));
+      const baseDelay = level <= 8
+        ? 600 - (level - 1) * (350 / 7)           // 1단계: 600ms, 8단계: 250ms (선형 보간)
+        : Math.max(200, 250 - (level - 8) * 10);  // 9단계 이후: 10ms씩 감소, 최소 200ms
       const loopDelay = baseDelay / speedMultiplier;
       gameLoopIntervalRef.current = setInterval(() => {
         gameLoop();
@@ -311,10 +313,10 @@ export default function VeniceGame() {
     const range = maxX - minX;
     const x = Math.floor(Math.random() * (range / 8)) * 8 + minX;
 
-    // 1단계(0.8) ~ 8단계(3.2, 4배) 선형 보간, 8단계 이상은 더 가속
-    const speedIncrease = level <= 8
-      ? 0.8 + (level - 1) * (2.4 / 7)  // 1단계: 0.8, 8단계: 3.2
-      : 3.2 + (level - 8) * 0.8;        // 8단계 이후는 0.8씩 증가
+    // 1단계(0.8) ~ 4단계(6.4) 선형 보간, 이후 급격히 가속
+    const speedIncrease = level <= 4
+      ? 0.8 + (level - 1) * (5.6 / 3)   // 1단계: 0.8, 4단계: 6.4
+      : 6.4 + (level - 4) * 2.5;         // 5단계 이후는 2.5씩 증가
 
     const newWord: FallingWord = {
       id: nextWordIdRef.current,
@@ -558,13 +560,13 @@ export default function VeniceGame() {
       case "speedup":
         setVirusMessage(t("날쌘 바이러스!", "Speed Up Virus!"));
         setSpeedMultiplier(1.5);
-        setTimeout(() => setSpeedMultiplier(1), 10000);
+        setTimeout(() => setSpeedMultiplier(1), 5000);
         break;
 
       case "slowdown":
         setVirusMessage(t("굼벵이 바이러스!", "Slow Down Virus!"));
         setSpeedMultiplier(0.5);
-        setTimeout(() => setSpeedMultiplier(1), 10000);
+        setTimeout(() => setSpeedMultiplier(1), 5000);
         break;
 
       case "hide":
@@ -580,7 +582,7 @@ export default function VeniceGame() {
           setFallingWords((prev) =>
             prev.map((w) => ({ ...w, isHidden: false }))
           );
-        }, 10000);
+        }, 5000);
         break;
 
       case "flood":
