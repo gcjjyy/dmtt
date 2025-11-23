@@ -1,4 +1,5 @@
 import postgres from "postgres";
+import "dotenv/config";
 
 // PostgreSQL connection
 // Set DATABASE_URL environment variable with your connection string
