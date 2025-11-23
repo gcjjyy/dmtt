@@ -244,14 +244,36 @@ export default function VeniceGame() {
     }
   }, [isGameOverAnimating]);
 
+  const getWordWidth = (word: string) => {
+    let width = 0;
+    for (const char of word) {
+      // 한글: 16px, 영어/숫자: 8px
+      if (char >= '\uAC00' && char <= '\uD7A3') {
+        width += 16;
+      } else {
+        width += 8;
+      }
+    }
+    return width;
+  };
+
   const spawnNewWord = () => {
     const randomWord = words[Math.floor(Math.random() * words.length)];
     const isVirus = Math.random() < 0.15; // 15% 확률로 바이러스
 
+    // 단어 너비 계산
+    const wordWidth = getWordWidth(randomWord);
+
+    // x좌표: 최소 8, 최대 GAME_WIDTH - wordWidth - 8 (우측 패딩), 8의 배수
+    const minX = 8;
+    const maxX = GAME_WIDTH - wordWidth - 8;
+    const range = maxX - minX;
+    const x = Math.floor(Math.random() * (range / 8)) * 8 + minX;
+
     const newWord: FallingWord = {
       id: nextWordIdRef.current,
       word: randomWord,
-      x: Math.random() * (GAME_WIDTH - 100),
+      x,
       y: 0,
       speed: (BASE_SPEED + level * 0.2) * speedMultiplier,
       isVirus,
@@ -598,13 +620,15 @@ export default function VeniceGame() {
           (w) => !w.isVirus || isAidsInfected
         );
 
-        if (damagingWords.length > 0) {
-          // 게임 오버가 아닐 때만 떨어지는 사운드 재생
+        // 단어가 떨어졌을 때 소리 재생 (바이러스 포함, 게임 오버 예정이 아닐 때만)
+        if (removed.length > 0) {
           const willGameOver = bricks - damagingWords.length <= 0;
           if (!willGameOver) {
             playBeep(250, 0.125);
           }
+        }
 
+        if (damagingWords.length > 0) {
           setWordsMissed((prev) => prev + damagingWords.length);
           setBricks((prevBricks) => {
             const newBricks = prevBricks - damagingWords.length;
