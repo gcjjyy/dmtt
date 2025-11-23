@@ -79,6 +79,8 @@ export default function VeniceGame() {
   const isProcessingCollisionRef = useRef(false);
   const cachedSurvivingWordsRef = useRef<FallingWord[] | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const isGameOverAnimatingRef = useRef(false);
+  const fallCountRef = useRef(0);
 
   const GAME_WIDTH = 800;
   const GAME_HEIGHT = 528;
@@ -128,7 +130,7 @@ export default function VeniceGame() {
       };
     } else {
       // Game not started or over - clear interval
-      console.log('🔥 [게임 루프 정지] gameStarted:', gameStarted, 'gameOver:', gameOver, 'isGameOverAnimating:', isGameOverAnimating);
+      console.log(`🔥 [${performance.now().toFixed(2)}ms] [게임 루프 정지] gameStarted:`, gameStarted, 'gameOver:', gameOver, 'isGameOverAnimating:', isGameOverAnimating);
       if (gameLoopIntervalRef.current) {
         clearInterval(gameLoopIntervalRef.current);
       }
@@ -194,38 +196,50 @@ export default function VeniceGame() {
   // Game over animation: input box falling
   useEffect(() => {
     if (isGameOverAnimating) {
-      console.log('🔥 [무너지기 시작] isGameOverAnimating = true');
-      const interval = setInterval(() => {
-        setInputBoxFallCount((prevCount) => {
-          const newCount = prevCount + 1;
-          console.log(`🔥 [무너지기 카운트] prevCount=${prevCount}, newCount=${newCount}, 거리=${newCount * 16}px`);
+      console.log(`🔥 [${performance.now().toFixed(2)}ms] [무너지기 useEffect 실행]`);
 
-          // 4번 무너지면 애니메이션 종료
-          if (newCount > 4) {
-            console.log('🔥 [무너지기 완료] 4번 무너짐, 랭킹 표시');
-            clearInterval(interval);
+      // 사운드를 한 번만 호출하여 4번 분량 모두 스케줄링
+      playGameOverSound();
 
-            // 랭킹 데이터 fetch
-            fetch('/api/ranking?type=venice')
-              .then(res => res.json())
-              .then(data => setVeniceRankings(data.rankings || []))
-              .catch(err => console.error('Failed to fetch rankings:', err));
+      // 1번째 무너짐 (즉시)
+      fallCountRef.current = 1;
+      setInputBoxFallCount(1);
+      console.log(`🔥 [${performance.now().toFixed(2)}ms] [무너지기 실행] 1번째 무너짐, 거리=16px`);
 
-            // 게임 오버 화면 표시
-            setGameOver(true);
-            return prevCount; // 카운트 변경 없음
-          }
+      // 2번째 무너짐 (875ms 후)
+      const timer1 = setTimeout(() => {
+        fallCountRef.current = 2;
+        setInputBoxFallCount(2);
+        console.log(`🔥 [${performance.now().toFixed(2)}ms] [무너지기 실행] 2번째 무너짐, 거리=32px`);
+      }, 875);
 
-          // 사운드 재생
-          console.log(`🔥 [무너지기 실행] ${newCount}번째 무너짐`);
-          playGameOverSound();
-          return newCount;
-        });
-      }, 875); // 0.875초마다 (사운드 재생 시간과 동일)
+      // 3번째 무너짐 (1750ms 후)
+      const timer2 = setTimeout(() => {
+        fallCountRef.current = 3;
+        setInputBoxFallCount(3);
+        console.log(`🔥 [${performance.now().toFixed(2)}ms] [무너지기 실행] 3번째 무너짐, 거리=48px`);
+      }, 1750);
+
+      // 4번째 무너짐 (2625ms 후)
+      const timer3 = setTimeout(() => {
+        fallCountRef.current = 4;
+        setInputBoxFallCount(4);
+        console.log(`🔥 [${performance.now().toFixed(2)}ms] [무너지기 실행] 4번째 무너짐, 거리=64px`);
+        console.log(`🔥 [${performance.now().toFixed(2)}ms] [무너지기 완료] 4번 무너짐, 랭킹 표시`);
+
+        // 랭킹 데이터 fetch
+        fetch('/api/ranking?type=venice')
+          .then(res => res.json())
+          .then(data => setVeniceRankings(data.rankings || []))
+          .catch(err => console.error('Failed to fetch rankings:', err));
+
+        setGameOver(true);
+      }, 2625);
 
       return () => {
-        console.log('🔥 [무너지기 정리] interval cleared');
-        clearInterval(interval);
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+        clearTimeout(timer3);
       };
     }
   }, [isGameOverAnimating]);
@@ -339,51 +353,63 @@ export default function VeniceGame() {
 
   const playGameOverSound = () => {
     try {
-      // 게임 오버 시: 200Hz 0.25초 → 600Hz 0.25초 → 400Hz 0.375초
+      const startTime = Date.now();
+      console.log(`🔊 [${startTime}] [사운드 시작] 4번 무너짐 사운드 모두 스케줄링`);
+
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
 
       const audioContext = audioContextRef.current;
+      const baseTime = audioContext.currentTime;
 
-      // 첫 번째 음: 200Hz, 0.25초
-      const osc1 = audioContext.createOscillator();
-      const gain1 = audioContext.createGain();
-      osc1.connect(gain1);
-      gain1.connect(audioContext.destination);
-      osc1.frequency.value = 200;
-      osc1.type = 'square';
-      gain1.gain.setValueAtTime(0.2, audioContext.currentTime);
-      gain1.gain.setValueAtTime(0.2, audioContext.currentTime + 0.25 * 0.85);
-      gain1.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.25);
-      osc1.start(audioContext.currentTime);
-      osc1.stop(audioContext.currentTime + 0.25);
+      // 4번 무너짐 사운드를 한 번에 모두 스케줄링 (각각 875ms 간격)
+      for (let i = 0; i < 4; i++) {
+        const offset = i * 0.875; // 0ms, 875ms, 1750ms, 2625ms
 
-      // 두 번째 음: 600Hz, 0.25초
-      const osc2 = audioContext.createOscillator();
-      const gain2 = audioContext.createGain();
-      osc2.connect(gain2);
-      gain2.connect(audioContext.destination);
-      osc2.frequency.value = 600;
-      osc2.type = 'square';
-      gain2.gain.setValueAtTime(0.2, audioContext.currentTime + 0.25);
-      gain2.gain.setValueAtTime(0.2, audioContext.currentTime + 0.25 + 0.25 * 0.85);
-      gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-      osc2.start(audioContext.currentTime + 0.25);
-      osc2.stop(audioContext.currentTime + 0.5);
+        // 200Hz, 0.25초
+        const osc1 = audioContext.createOscillator();
+        const gain1 = audioContext.createGain();
+        osc1.connect(gain1);
+        gain1.connect(audioContext.destination);
+        osc1.frequency.value = 200;
+        osc1.type = 'square';
+        gain1.gain.setValueAtTime(0.2, baseTime + offset);
+        gain1.gain.setValueAtTime(0.2, baseTime + offset + 0.25 * 0.85);
+        gain1.gain.exponentialRampToValueAtTime(0.01, baseTime + offset + 0.25);
+        osc1.start(baseTime + offset);
+        osc1.stop(baseTime + offset + 0.25);
 
-      // 세 번째 음: 400Hz, 0.375초 (1.5배)
-      const osc3 = audioContext.createOscillator();
-      const gain3 = audioContext.createGain();
-      osc3.connect(gain3);
-      gain3.connect(audioContext.destination);
-      osc3.frequency.value = 400;
-      osc3.type = 'square';
-      gain3.gain.setValueAtTime(0.2, audioContext.currentTime + 0.5);
-      gain3.gain.setValueAtTime(0.2, audioContext.currentTime + 0.5 + 0.375 * 0.85);
-      gain3.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.875);
-      osc3.start(audioContext.currentTime + 0.5);
-      osc3.stop(audioContext.currentTime + 0.875);
+        // 600Hz, 0.25초
+        const osc2 = audioContext.createOscillator();
+        const gain2 = audioContext.createGain();
+        osc2.connect(gain2);
+        gain2.connect(audioContext.destination);
+        osc2.frequency.value = 600;
+        osc2.type = 'square';
+        gain2.gain.setValueAtTime(0.2, baseTime + offset + 0.25);
+        gain2.gain.setValueAtTime(0.2, baseTime + offset + 0.5 * 0.85);
+        gain2.gain.exponentialRampToValueAtTime(0.01, baseTime + offset + 0.5);
+        osc2.start(baseTime + offset + 0.25);
+        osc2.stop(baseTime + offset + 0.5);
+
+        // 400Hz, 0.375초
+        const osc3 = audioContext.createOscillator();
+        const gain3 = audioContext.createGain();
+        osc3.connect(gain3);
+        gain3.connect(audioContext.destination);
+        osc3.frequency.value = 400;
+        osc3.type = 'square';
+        gain3.gain.setValueAtTime(0.2, baseTime + offset + 0.5);
+        gain3.gain.setValueAtTime(0.2, baseTime + offset + 0.5 + 0.375 * 0.85);
+        gain3.gain.exponentialRampToValueAtTime(0.01, baseTime + offset + 0.875);
+        osc3.start(baseTime + offset + 0.5);
+        osc3.stop(baseTime + offset + 0.875);
+
+        console.log(`🔊 [${startTime + offset * 1000}] [${i + 1}번째 무너짐 사운드] ${offset * 1000}ms에 스케줄링`);
+      }
+
+      console.log(`🔊 [사운드 스케줄링 완료] 4번 무너짐 사운드 모두 예약됨`);
     } catch (e) {
       console.error('Failed to play game over sound:', e);
     }
@@ -514,6 +540,12 @@ export default function VeniceGame() {
   };
 
   const gameLoop = () => {
+    // 게임 오버 애니메이션 중이면 즉시 리턴
+    if (isGameOverAnimatingRef.current) {
+      console.log(`🔥 [${performance.now().toFixed(2)}ms] [게임 루프 스킵] 무너지는 중`);
+      return;
+    }
+
     // 마취 상태면 게임 로직 실행 안 함
     if (isFrozen) {
       return;
@@ -550,9 +582,6 @@ export default function VeniceGame() {
       if (removed.length > 0) {
         isProcessingCollisionRef.current = true;
 
-        // 단어가 떨어질 때마다 비프음 (250Hz, 0.125초)
-        playBeep(250, 0.125);
-
         // 지뢰로 제거된 단어는 점수 추가
         const mineHits = removed.filter((word) =>
           mines.some((mine) =>
@@ -570,12 +599,19 @@ export default function VeniceGame() {
         );
 
         if (damagingWords.length > 0) {
+          // 게임 오버가 아닐 때만 떨어지는 사운드 재생
+          const willGameOver = bricks - damagingWords.length <= 0;
+          if (!willGameOver) {
+            playBeep(250, 0.125);
+          }
+
           setWordsMissed((prev) => prev + damagingWords.length);
           setBricks((prevBricks) => {
             const newBricks = prevBricks - damagingWords.length;
-            console.log(`🔥 [생명 변경] 이전 생명: ${prevBricks}, 데미지: ${damagingWords.length}, 새 생명: ${newBricks}`);
+            console.log(`🔥 [${performance.now().toFixed(2)}ms] [생명 변경] 이전 생명: ${prevBricks}, 데미지: ${damagingWords.length}, 새 생명: ${newBricks}`);
             if (newBricks <= 0) {
-              console.log("🔥 [게임 오버 트리거] 생명 0 이하, 무너지기 시작!");
+              console.log(`🔥 [${performance.now().toFixed(2)}ms] [게임 오버 트리거] 생명 0 이하, 무너지기 트리거`);
+              isGameOverAnimatingRef.current = true;
               setIsGameOverAnimating(true);
             }
             return Math.max(0, newBricks);
@@ -667,8 +703,9 @@ export default function VeniceGame() {
     setIsGameOverAnimating(false);
     setInputBoxFallCount(0);
     setVeniceRankings([]);
+    isGameOverAnimatingRef.current = false;
 
-    // AudioContext 미리 초기화 (딜레이 제거)
+    // AudioContext 미리 초기화 및 모든 사운드 워밍업 (딜레이 제거)
     try {
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -677,15 +714,75 @@ export default function VeniceGame() {
         await audioContextRef.current.resume();
       }
 
-      // 무음 오실레이터로 AudioContext 워밍업 (게임 오버 사운드 딜레이 제거)
       const audioContext = audioContextRef.current;
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      gainNode.gain.value = 0; // 무음
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.001); // 1ms
+      let currentTime = audioContext.currentTime;
+
+      // 1. 단어 떨어지는 소리 워밍업: 250Hz, 0.125초
+      const fall1 = audioContext.createOscillator();
+      const fallGain1 = audioContext.createGain();
+      fall1.connect(fallGain1);
+      fallGain1.connect(audioContext.destination);
+      fall1.frequency.value = 250;
+      fall1.type = 'square';
+      fallGain1.gain.value = 0;
+      fall1.start(currentTime);
+      fall1.stop(currentTime + 0.125);
+      currentTime += 0.125;
+
+      // 2. 단어 잡는 소리 워밍업: 250Hz 0.1초 → 500Hz 0.1초
+      const catch1 = audioContext.createOscillator();
+      const catchGain1 = audioContext.createGain();
+      catch1.connect(catchGain1);
+      catchGain1.connect(audioContext.destination);
+      catch1.frequency.value = 250;
+      catch1.type = 'square';
+      catchGain1.gain.value = 0;
+      catch1.start(currentTime);
+      catch1.stop(currentTime + 0.1);
+
+      const catch2 = audioContext.createOscillator();
+      const catchGain2 = audioContext.createGain();
+      catch2.connect(catchGain2);
+      catchGain2.connect(audioContext.destination);
+      catch2.frequency.value = 500;
+      catch2.type = 'square';
+      catchGain2.gain.value = 0;
+      catch2.start(currentTime + 0.1);
+      catch2.stop(currentTime + 0.2);
+      currentTime += 0.2;
+
+      // 3. 게임 오버 사운드 워밍업: 200Hz 0.25초 → 600Hz 0.25초 → 400Hz 0.375초
+      const over1 = audioContext.createOscillator();
+      const overGain1 = audioContext.createGain();
+      over1.connect(overGain1);
+      overGain1.connect(audioContext.destination);
+      over1.frequency.value = 200;
+      over1.type = 'square';
+      overGain1.gain.value = 0;
+      over1.start(currentTime);
+      over1.stop(currentTime + 0.25);
+
+      const over2 = audioContext.createOscillator();
+      const overGain2 = audioContext.createGain();
+      over2.connect(overGain2);
+      overGain2.connect(audioContext.destination);
+      over2.frequency.value = 600;
+      over2.type = 'square';
+      overGain2.gain.value = 0;
+      over2.start(currentTime + 0.25);
+      over2.stop(currentTime + 0.5);
+
+      const over3 = audioContext.createOscillator();
+      const overGain3 = audioContext.createGain();
+      over3.connect(overGain3);
+      overGain3.connect(audioContext.destination);
+      over3.frequency.value = 400;
+      over3.type = 'square';
+      overGain3.gain.value = 0;
+      over3.start(currentTime + 0.5);
+      over3.stop(currentTime + 0.875);
+
+      console.log('🔊 [게임 시작] 모든 사운드 워밍업 완료 (떨어짐, 잡기, 게임오버)');
     } catch (err) {
       console.error("Failed to initialize audio:", err);
     }
@@ -829,6 +926,7 @@ export default function VeniceGame() {
                       setIsGameOverAnimating(false);
                       setInputBoxFallCount(0);
                       setVeniceRankings([]);
+                      isGameOverAnimatingRef.current = false;
                     }}
                     className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
                   >
@@ -847,7 +945,7 @@ export default function VeniceGame() {
 
           {/* Input Box (inside game area) */}
           <div
-            className="absolute left-1/2 transform -translate-x-1/2"
+            className="absolute left-1/2 transform -translate-x-1/2 z-30"
             style={{
               ...(isGameOverAnimating
                 ? { top: `${INPUT_TOP + inputBoxFallDistance}px` }
@@ -876,28 +974,38 @@ export default function VeniceGame() {
             style={{ bottom: 0, height: `${BRICK_HEIGHT}px` }}
           >
             <div className="grid grid-cols-3">
-              {Array.from({ length: 12 }).map((_, index) => (
-                <div
-                  key={index}
-                  className={`w-8 h-4 relative ${
-                    index < bricks
-                      ? "bg-gradient-to-br from-sky-400 via-sky-500 to-sky-600 border-t-2 border-l-2 border-sky-100 border-r-2 border-b-2 border-r-sky-950 border-b-black shadow-md"
-                      : "bg-gradient-to-br from-gray-800 via-gray-900 to-black border-t-2 border-l-2 border-gray-700 border-r-2 border-b-2 border-r-black border-b-black shadow-inner"
-                  }`}
-                  style={
-                    index < bricks
-                      ? {
-                          backgroundImage:
-                            "repeating-linear-gradient(45deg, #5eb8d9, #5eb8d9 2px, #7ec8e3 2px, #7ec8e3 4px)",
-                        }
-                      : {
-                          backgroundImage:
-                            "linear-gradient(135deg, #1a1a1a 25%, #2d2d2d 25%, #2d2d2d 50%, #1a1a1a 50%, #1a1a1a 75%, #2d2d2d 75%)",
-                          backgroundSize: "4px 4px",
-                        }
-                  }
-                />
-              ))}
+              {Array.from({ length: 12 }).map((_, index) => {
+                // 무너진 블럭은 숨김 (윗줄부터 1줄씩)
+                // index 0,1,2 = 1번째 줄 (맨 위)
+                // index 3,4,5 = 2번째 줄
+                // index 6,7,8 = 3번째 줄
+                // index 9,10,11 = 4번째 줄 (맨 아래)
+                const shouldHide = index < inputBoxFallCount * 3;
+
+                return (
+                  <div
+                    key={index}
+                    className={`w-8 h-4 relative ${
+                      index < bricks
+                        ? "bg-gradient-to-br from-sky-400 via-sky-500 to-sky-600 border-t-2 border-l-2 border-sky-100 border-r-2 border-b-2 border-r-sky-950 border-b-black shadow-md"
+                        : "bg-gradient-to-br from-gray-800 via-gray-900 to-black border-t-2 border-l-2 border-gray-700 border-r-2 border-b-2 border-r-black border-b-black shadow-inner"
+                    }`}
+                    style={{
+                      ...(index < bricks
+                        ? {
+                            backgroundImage:
+                              "repeating-linear-gradient(45deg, #5eb8d9, #5eb8d9 2px, #7ec8e3 2px, #7ec8e3 4px)",
+                          }
+                        : {
+                            backgroundImage:
+                              "linear-gradient(135deg, #1a1a1a 25%, #2d2d2d 25%, #2d2d2d 50%, #1a1a1a 50%, #1a1a1a 75%, #2d2d2d 75%)",
+                            backgroundSize: "4px 4px",
+                          }),
+                      visibility: shouldHide ? 'hidden' : 'visible'
+                    }}
+                  />
+                );
+              })}
             </div>
           </div>
 
