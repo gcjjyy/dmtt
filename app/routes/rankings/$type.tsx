@@ -67,11 +67,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       extra: typeof score.extra === 'string' ? JSON.parse(score.extra) : score.extra
     }));
 
-    // Debug: Log first score to check extra field
-    if (scores.length > 0) {
-      console.log("First score:", JSON.stringify(scores[0], null, 2));
-    }
-
     return { scores, type, year, month, currentYear, currentMonth };
   } catch (error) {
     console.error("Error loading scores:", error);

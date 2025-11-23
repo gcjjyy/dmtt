@@ -46,7 +46,7 @@ export default function VeniceGame() {
   const [gameStarted, setGameStarted] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
-  const [bricks, setBricks] = useState(1);
+  const [bricks, setBricks] = useState(12);
   const [stage, setStage] = useState(1);
   const [fallingWords, setFallingWords] = useState<FallingWord[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -330,7 +330,6 @@ export default function VeniceGame() {
 
     nextWordIdRef.current += 1;
     setFallingWords((prev) => {
-      console.log(`[단어생성] ID=${newWord.id}, 단어="${newWord.word}", 바이러스=${isVirus}, 화면단어수=${prev.length} → ${prev.length + 1}`);
       return [...prev, newWord];
     });
   };
@@ -514,7 +513,6 @@ export default function VeniceGame() {
         setVirusMessage(t("싹쓸이 바이러스!", "Sweep Virus!"));
         // 지뢰 제외, 바이러스 자기 자신도 제외 (자신은 나중에 사용자입력에서 카운팅)
         const currentWords = fallingWords.filter((w) => !w.isMine && w.id !== word.id).length;
-        console.log(`🔥 [싹쓸이] ${currentWords}개 단어 제거`);
 
         setFallingWords([]);
 
@@ -523,14 +521,12 @@ export default function VeniceGame() {
           setTotalWordsProcessed((prevTotal) => {
             const newTotal = prevTotal + currentWords;
             totalWordsProcessedRef.current = newTotal; // ref 동기화
-            console.log(`🔥 [싹쓸이] 단어 처리 카운터: ${prevTotal} → ${newTotal}`);
 
             // 단계 상승 조건 체크
             const { stage: currentStage } = getStageFromWordCount(prevTotal);
             const { stage: newStage } = getStageFromWordCount(newTotal);
 
             if (newStage > currentStage) {
-              console.log(`🔥 [싹쓸이] 단계 상승 트리거! ${prevTotal} → ${newTotal}개 처리 완료 → 단계 ${currentStage} → ${newStage}`);
               setStage(newStage);
               setIsStageTransition(true);
               // input에서 포커스 제거 (다음 틱에 실행)
@@ -599,7 +595,6 @@ export default function VeniceGame() {
         setVirusMessage(t("지뢰 바이러스!", "Mine Virus!"));
         // 단어를 지뢰로 변환 (이미 제거된 상태이므로 다시 추가)
         setFallingWords((prev) => {
-          console.log(`[지뢰생성] ID=${word.id}, 단어="${word.word}", 화면단어수=${prev.length} → ${prev.length + 1}`);
           return [
             ...prev,
             { ...word, isMine: true, isVirus: false }
@@ -717,11 +712,9 @@ export default function VeniceGame() {
 
     if (spawnCounterRef.current >= spawnInterval) {
       if (canSpawn) {
-        console.log(`🔥 [단어생성] ID=${nextWordIdRef.current}, 처리=${totalWordsProcessedRef.current}, 최대=${currentStageMaxWords}`);
         spawnNewWord();
         spawnCounterRef.current = 0;
       } else {
-        console.log(`🔥 [단어생성차단] ID=${nextWordIdRef.current}, 처리=${totalWordsProcessedRef.current}, 최대=${currentStageMaxWords}`);
       }
     }
 
@@ -808,21 +801,18 @@ export default function VeniceGame() {
 
         // 제거된 단어 로그 (지뢰, 일반 모두)
         removed.forEach(w => {
-          console.log(`[충돌제거] ID=${w.id}, 단어="${w.word}", 바이러스=${w.isVirus}, 지뢰=${w.isMine}, y=${w.y.toFixed(0)}`);
         });
 
         if (nonMineRemovedCount > 0) {
           setTotalWordsProcessed((prev) => {
             const newTotal = prev + nonMineRemovedCount;
             totalWordsProcessedRef.current = newTotal; // ref 동기화
-            console.log(`🔥 [충돌체크] 단어 처리 카운터: ${prev} → ${newTotal} (제거된 단어: ${nonMineRemovedCount}개, 지뢰 제외)`);
 
             // 단계 상승 조건 체크
             const { stage: currentStage } = getStageFromWordCount(prev);
             const { stage: newStage } = getStageFromWordCount(newTotal);
 
             if (newStage > currentStage) {
-              console.log(`🔥 [충돌체크] 단계 상승 트리거! ${prev} → ${newTotal}개 처리 완료 → 단계 ${currentStage} → ${newStage}`);
               setStage(newStage);
               setIsStageTransition(true);
               // input에서 포커스 제거 (다음 틱에 실행)
@@ -876,7 +866,6 @@ export default function VeniceGame() {
         // Remove the matched word
         setFallingWords((prev) => {
           const filtered = prev.filter((w) => w.id !== matchedWord.id);
-          console.log(`[사용자제거] ID=${matchedWord.id}, 단어="${matchedWord.word}", 바이러스=${matchedWord.isVirus}, 지뢰=${matchedWord.isMine}, 화면단어수=${prev.length} → ${filtered.length}`);
           return filtered;
         });
 
@@ -896,14 +885,12 @@ export default function VeniceGame() {
         setTotalWordsProcessed((prev) => {
           const newTotal = prev + 1;
           totalWordsProcessedRef.current = newTotal; // ref 동기화
-          console.log(`🔥 [사용자입력] 단어 처리 카운터: ${prev} → ${newTotal}`);
 
           // 단계 상승 조건 체크
           const { stage: currentStage } = getStageFromWordCount(prev);
           const { stage: newStage } = getStageFromWordCount(newTotal);
 
           if (newStage > currentStage) {
-            console.log(`🔥 [사용자입력] 단계 상승 트리거! ${prev} → ${newTotal}개 처리 완료 → 단계 ${currentStage} → ${newStage}`);
             setStage(newStage);
             setIsStageTransition(true);
             // input에서 포커스 제거 (다음 틱에 실행)
@@ -930,7 +917,7 @@ export default function VeniceGame() {
     setGameStarted(true);
     setGameOver(false);
     setScore(0);
-    setBricks(1);
+    setBricks(12);
     setStage(1);
     setFallingWords([]);
     setInputValue("");

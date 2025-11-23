@@ -19,13 +19,13 @@ interface Score {
 
 export async function loader() {
   try {
-    // Fetch top 5 scores for each type
+    // Fetch top 10 scores for each type
     const rawShortScores = await sql<Score[]>`
       SELECT id, name, type, score, created_at, extra
       FROM scores
       WHERE type = 'short'
       ORDER BY score DESC
-      LIMIT 5
+      LIMIT 10
     `;
 
     const rawLongScores = await sql<Score[]>`
@@ -33,7 +33,7 @@ export async function loader() {
       FROM scores
       WHERE type = 'long'
       ORDER BY score DESC
-      LIMIT 5
+      LIMIT 10
     `;
 
     const rawVeniceScores = await sql<Score[]>`
@@ -41,7 +41,7 @@ export async function loader() {
       FROM scores
       WHERE type = 'venice'
       ORDER BY score DESC
-      LIMIT 5
+      LIMIT 10
     `;
 
     // Parse extra field if it's a string
@@ -93,19 +93,19 @@ export default function Home() {
   };
 
   return (
-    <div className="w-full h-full bg-[#008080] px-4 pb-4 pt-11 relative flex flex-col">
+    <div className="w-full h-full bg-[#008080] px-4 pb-12 relative flex flex-col items-center justify-center">
       {/* Title */}
       <div className="text-center text-white mb-4">
         {t(`이번 달(${monthNames.ko[currentMonth - 1]}) 랭킹`, `This Month (${monthNames.en[currentMonth - 1]}) Rankings`)}
       </div>
 
-      <div className="grid grid-cols-3 gap-4 flex-1">
+      <div className="grid grid-cols-3 gap-4">
         {rankingTypes.map((type) => {
           const typeKey = type.key as "short" | "long" | "venice";
           const scores = rankings[typeKey];
 
           return (
-            <DosWindow key={type.key} title={type.title} className="flex-1">
+            <DosWindow key={type.key} title={type.title} className="h-[380px]">
               <div className="p-2 flex flex-col h-full">
                 {scores.length === 0 ? (
                   <div className="text-center py-4 text-black flex-1 flex items-center justify-center">

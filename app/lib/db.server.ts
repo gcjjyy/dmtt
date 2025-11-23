@@ -18,8 +18,7 @@ export const sql = postgres(connectionString, {
 // Helper function to test connection
 export async function testConnection() {
   try {
-    const result = await sql`SELECT NOW()`;
-    console.log("Database connected successfully:", result[0]);
+    await sql`SELECT NOW()`;
     return true;
   } catch (error) {
     console.error("Database connection failed:", error);
