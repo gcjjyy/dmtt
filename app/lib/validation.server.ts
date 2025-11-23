@@ -94,6 +94,22 @@ export function validateText(text: string, maxLength: number = 10000): Validatio
 }
 
 /**
+ * Calculate name length (Korean = 2, others = 1)
+ */
+function calculateNameLength(name: string): number {
+  let length = 0;
+  for (const char of name) {
+    // 한글 유니코드 범위: AC00-D7A3
+    if (char >= '\uAC00' && char <= '\uD7A3') {
+      length += 2;
+    } else {
+      length += 1;
+    }
+  }
+  return length;
+}
+
+/**
  * Validate name
  */
 export function validateName(name: string): ValidationResult {
@@ -103,14 +119,16 @@ export function validateName(name: string): ValidationResult {
     errors.push("Name is required");
   }
 
-  if (name.length > 50) {
-    errors.push("Name too long (max 50 characters)");
-  }
-
-  // Check for reasonable characters (allow Korean, English, numbers, spaces)
-  const validNamePattern = /^[가-힣a-zA-Z0-9\s]+$/;
+  // Check for reasonable characters (allow Korean, English, numbers, spaces, dots, hyphens)
+  const validNamePattern = /^[가-힣a-zA-Z0-9\s.\-]+$/;
   if (!validNamePattern.test(name.trim())) {
     errors.push("Name contains invalid characters");
+  }
+
+  // 길이 체크 (한글=2, 영문/숫자/공백=1, 최대 16)
+  const nameLength = calculateNameLength(name.trim());
+  if (nameLength > 16) {
+    errors.push("Name too long (Korean: 8 chars max, English: 16 chars max)");
   }
 
   return {

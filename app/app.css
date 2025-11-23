@@ -39,13 +39,29 @@ html {
 
 html,
 body {
-  background-color: #C0C0C0;
+  background-color: #C0C0C0; /* Darker Gray */
   color: #000;
   margin: 0;
   padding: 0;
   font-size: 16px;
   font-weight: normal;
   font-style: normal;
+}
+
+/* 모바일 스케일링: 800px 너비를 화면에 맞춤 */
+@media (max-width: 800px) {
+  body {
+    width: 800px;
+    transform-origin: top left;
+  }
+
+  /* 화면 너비에 맞게 스케일 조정 */
+  @supports (width: 100vw) {
+    body {
+      transform: scale(calc(100vw / 800));
+      height: calc(100vh / (100vw / 800));
+    }
+  }
 }
 
 /* 유틸리티 클래스 */

@@ -114,7 +114,7 @@ export default function MainLayout() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#C0C0C0] flex items-center justify-center m-0 p-0">
+    <div className="min-h-screen flex items-center justify-center m-0 p-0">
       <div className="w-[800px] h-[600px] flex flex-col m-0 outline outline-1 outline-black">
         {/* Title Bar */}
         <div className="bg-[#0000AA] border-t border-l border-b border-t-white border-l-white border-b-black h-6 px-1 text-white flex justify-center items-center">

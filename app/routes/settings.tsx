@@ -23,6 +23,20 @@ export default function Settings() {
     setLanguage(lang);
   };
 
+  // 이름 길이 계산 (한글 = 2, 영문/숫자/공백 = 1)
+  const calculateNameLength = (name: string): number => {
+    let length = 0;
+    for (const char of name) {
+      // 한글 유니코드 범위: AC00-D7A3
+      if (char >= '\uAC00' && char <= '\uD7A3') {
+        length += 2;
+      } else {
+        length += 1;
+      }
+    }
+    return length;
+  };
+
   const handleUsernameChange = () => {
     const trimmedName = newUsername.trim();
 
@@ -32,14 +46,17 @@ export default function Settings() {
       return;
     }
 
-    if (trimmedName.length > 50) {
-      setUsernameError(t("이름은 50자 이내로 입력해주세요", "Name must be 50 characters or less"));
+    // Check for valid characters (Korean, English, numbers, spaces, dots, hyphens)
+    const validNamePattern = /^[가-힣a-zA-Z0-9\s.\-]+$/;
+    if (!validNamePattern.test(trimmedName)) {
+      setUsernameError(t("한글, 영문, 숫자, 공백, 점, 하이픈만 사용 가능합니다", "Only Korean, English, numbers, spaces, dots, and hyphens allowed"));
       return;
     }
 
-    const validNamePattern = /^[가-힣a-zA-Z0-9\s]+$/;
-    if (!validNamePattern.test(trimmedName)) {
-      setUsernameError(t("한글, 영문, 숫자만 사용 가능합니다", "Only Korean, English, and numbers allowed"));
+    // 길이 체크 (한글=2, 영문/숫자/공백=1, 최대 16)
+    const nameLength = calculateNameLength(trimmedName);
+    if (nameLength > 16) {
+      setUsernameError(t("이름이 너무 깁니다 (한글 최대 8자, 영문 최대 16자)", "Name is too long (Korean: 8 chars max, English: 16 chars max)"));
       return;
     }
 
