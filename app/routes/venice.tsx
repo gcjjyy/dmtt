@@ -23,6 +23,8 @@ interface FallingWord {
   speed: number;
   isVirus?: boolean;
   isHidden?: boolean; // For 숨바꼭질 바이러스
+  forcedEffect?: VirusEffect; // 테스트용: 강제 바이러스 효과
+  isMine?: boolean; // 지뢰로 변환된 단어
 }
 
 type VirusEffect =
@@ -35,11 +37,6 @@ type VirusEffect =
   | "flood" // 패거리
   | "mine" // 지뢰
   | "aids"; // 에이즈
-
-interface Mine {
-  x: number;
-  y: number;
-}
 
 export default function VeniceGame() {
   const { words, language } = useLoaderData<typeof loader>();
@@ -55,7 +52,6 @@ export default function VeniceGame() {
   const [fallingWords, setFallingWords] = useState<FallingWord[]>([]);
   const [inputValue, setInputValue] = useState("");
   const nextWordIdRef = useRef(0);
-  const [mines, setMines] = useState<Mine[]>([]);
   const [isFrozen, setIsFrozen] = useState(false);
   const [speedMultiplier, setSpeedMultiplier] = useState(1);
   const [isAidsInfected, setIsAidsInfected] = useState(false);
@@ -119,7 +115,9 @@ export default function VeniceGame() {
 
       // Game loop interval - speed increases with level
       // Level 1: 1초, Level 8: 0.5초
-      const loopDelay = Math.max(500, 1000 - (level - 1) * (500 / 7));
+      // speedMultiplier로 나눠서 속도 조절 (1.5 = 빠르게, 0.5 = 느리게)
+      const baseDelay = Math.max(500, 1000 - (level - 1) * (500 / 7));
+      const loopDelay = baseDelay / speedMultiplier;
       gameLoopIntervalRef.current = setInterval(() => {
         gameLoop();
       }, loopDelay) as unknown as number;
@@ -136,7 +134,7 @@ export default function VeniceGame() {
         clearInterval(gameLoopIntervalRef.current);
       }
     }
-  }, [gameStarted, gameOver, isGameOverAnimating, level]);
+  }, [gameStarted, gameOver, isGameOverAnimating, level, speedMultiplier]);
 
   // Submit score when game is over
   useEffect(() => {
@@ -260,7 +258,8 @@ export default function VeniceGame() {
 
   const spawnNewWord = () => {
     const randomWord = words[Math.floor(Math.random() * words.length)];
-    const isVirus = Math.random() < 0.15; // 15% 확률로 바이러스
+    // 테스트: 4번째 단어(id=3)를 지뢰 바이러스로 강제
+    const isVirus = nextWordIdRef.current === 3 ? true : Math.random() < 0.15;
 
     // 단어 너비 계산
     const wordWidth = getWordWidth(randomWord);
@@ -278,33 +277,43 @@ export default function VeniceGame() {
       y: 0,
       speed: (BASE_SPEED + level * 0.2) * speedMultiplier,
       isVirus,
+      // 테스트: 4번째 단어는 강제로 mine 효과
+      forcedEffect: nextWordIdRef.current === 3 ? "mine" : undefined,
     };
 
     nextWordIdRef.current += 1;
     setFallingWords((prev) => [...prev, newWord]);
   };
 
-  const triggerVirusEffect = (x: number, y: number) => {
-    const virusEffects: VirusEffect[] = [
-      "sweep", "freeze", "heal", "speedup", "slowdown",
-      "hide", "flood", "mine", "aids"
-    ];
+  const triggerVirusEffect = (word: FallingWord, forcedEffect?: VirusEffect) => {
+    let selectedEffect: VirusEffect;
 
-    // 재건은 레어하게 (5% 확률로만)
-    const weights = [15, 15, 5, 10, 15, 10, 15, 10, 5];
-    let totalWeight = weights.reduce((a, b) => a + b, 0);
-    let random = Math.random() * totalWeight;
+    // 강제 효과가 있으면 그걸 사용 (테스트용)
+    if (forcedEffect) {
+      selectedEffect = forcedEffect;
+    } else {
+      // 랜덤 선택
+      const virusEffects: VirusEffect[] = [
+        "sweep", "freeze", "heal", "speedup", "slowdown",
+        "hide", "flood", "mine", "aids"
+      ];
 
-    let selectedEffect: VirusEffect = "sweep";
-    for (let i = 0; i < virusEffects.length; i++) {
-      random -= weights[i];
-      if (random <= 0) {
-        selectedEffect = virusEffects[i];
-        break;
+      // 재건은 레어하게 (5% 확률로만)
+      const weights = [15, 15, 5, 10, 15, 10, 15, 10, 5];
+      let totalWeight = weights.reduce((a, b) => a + b, 0);
+      let random = Math.random() * totalWeight;
+
+      selectedEffect = "sweep";
+      for (let i = 0; i < virusEffects.length; i++) {
+        random -= weights[i];
+        if (random <= 0) {
+          selectedEffect = virusEffects[i];
+          break;
+        }
       }
     }
 
-    applyVirusEffect(selectedEffect, x, y);
+    applyVirusEffect(selectedEffect, word);
   };
 
   const playBeep = (frequency: number, duration: number) => {
@@ -438,7 +447,7 @@ export default function VeniceGame() {
     }
   };
 
-  const applyVirusEffect = (effect: VirusEffect, x: number, y: number) => {
+  const applyVirusEffect = (effect: VirusEffect, word: FallingWord) => {
     switch (effect) {
       case "sweep":
         setVirusMessage(t("싹쓸이 바이러스!", "Sweep Virus!"));
@@ -459,13 +468,13 @@ export default function VeniceGame() {
       case "speedup":
         setVirusMessage(t("날쌘 바이러스!", "Speed Up Virus!"));
         setSpeedMultiplier(1.5);
-        setTimeout(() => setSpeedMultiplier(1), 5000);
+        setTimeout(() => setSpeedMultiplier(1), 30000);
         break;
 
       case "slowdown":
         setVirusMessage(t("굼벵이 바이러스!", "Slow Down Virus!"));
         setSpeedMultiplier(0.5);
-        setTimeout(() => setSpeedMultiplier(1), 5000);
+        setTimeout(() => setSpeedMultiplier(1), 30000);
         break;
 
       case "hide":
@@ -499,7 +508,11 @@ export default function VeniceGame() {
 
       case "mine":
         setVirusMessage(t("지뢰 바이러스!", "Mine Virus!"));
-        setMines((prev) => [...prev, { x, y }]);
+        // 단어를 지뢰로 변환 (이미 제거된 상태이므로 다시 추가)
+        setFallingWords((prev) => [
+          ...prev,
+          { ...word, isMine: true, isVirus: false }
+        ]);
         break;
 
       case "aids":
@@ -508,27 +521,14 @@ export default function VeniceGame() {
     }
 
     // 메시지 자동 제거
-    setTimeout(() => setVirusMessage(null), 2000);
+    setTimeout(() => setVirusMessage(null), 4000);
   };
 
-  const checkCollisions = (words: FallingWord[]): { surviving: FallingWord[]; removed: FallingWord[] } => {
+  const checkCollisions = (words: FallingWord[]): { surviving: FallingWord[]; removed: FallingWord[]; wordsHitByMines: Set<number> } => {
     let remaining = [...words];
     const removed: FallingWord[] = [];
 
-    // 1. 지뢰 충돌 체크
-    remaining = remaining.filter((word) => {
-      const hitMine = mines.some(
-        (mine) =>
-          Math.abs(word.x - mine.x) < 50 && Math.abs(word.y - mine.y) < 30
-      );
-      if (hitMine) {
-        removed.push(word);
-        return false;
-      }
-      return true;
-    });
-
-    // 2. 입력박스 충돌 체크
+    // 1. 입력박스 충돌 체크
     const INPUT_BOX_X = (GAME_WIDTH - 128) / 2;
     const INPUT_BOX_WIDTH = 128;
     const INPUT_BOX_BOTTOM = INPUT_TOP + INPUT_HEIGHT;
@@ -550,7 +550,7 @@ export default function VeniceGame() {
       return true;
     });
 
-    // 3. 물결 도달 체크
+    // 2. 물결 도달 체크
     remaining = remaining.filter((word) => {
       if (word.y >= WAVE_TOP) {
         removed.push(word);
@@ -559,7 +559,46 @@ export default function VeniceGame() {
       return true;
     });
 
-    return { surviving: remaining, removed };
+    // 3. 지뢰 충돌 체크 - 일반 단어와 지뢰 단어 충돌 시 둘 다 제거
+    const mineWords = remaining.filter((w) => w.isMine);
+    const nonMineWords = remaining.filter((w) => !w.isMine);
+
+    const wordsHitByMines = new Set<number>();
+    const minesHitByWords = new Set<number>();
+
+    nonMineWords.forEach((word) => {
+      const wordWidth = getWordWidth(word.word);
+
+      mineWords.forEach((mine) => {
+        const mineWidth = getWordWidth(mine.word);
+
+        // 충돌 체크
+        const verticalCollision = Math.abs(word.y - mine.y) < 16;
+        const horizontalCollision = !(
+          word.x + wordWidth < mine.x ||
+          word.x > mine.x + mineWidth
+        );
+
+        if (verticalCollision && horizontalCollision) {
+          wordsHitByMines.add(word.id);
+          minesHitByWords.add(mine.id);
+        }
+      });
+    });
+
+    // 충돌한 단어와 지뢰 모두 제거
+    remaining = remaining.filter((word) =>
+      !wordsHitByMines.has(word.id) && !minesHitByWords.has(word.id)
+    );
+
+    // 지뢰 충돌로 제거된 단어만 추가 (입력박스/물결로 이미 제거된 단어 제외)
+    const alreadyRemovedIds = new Set(removed.map(w => w.id));
+    removed.push(
+      ...nonMineWords.filter((w) => wordsHitByMines.has(w.id) && !alreadyRemovedIds.has(w.id)),
+      ...mineWords.filter((m) => minesHitByWords.has(m.id))
+    );
+
+    return { surviving: remaining, removed, wordsHitByMines };
   };
 
   const gameLoop = () => {
@@ -589,14 +628,14 @@ export default function VeniceGame() {
         return cachedSurvivingWordsRef.current;
       }
 
-      // 단어 이동
+      // 단어 이동 (지뢰는 이동하지 않음)
       const movedWords = prev.map((word) => ({
         ...word,
-        y: word.y + 16,
+        y: word.isMine ? word.y : word.y + 16,
       }));
 
       // 충돌 체크
-      const { surviving, removed } = checkCollisions(movedWords);
+      const { surviving, removed, wordsHitByMines } = checkCollisions(movedWords);
 
       // 캐시에 저장
       cachedSurvivingWordsRef.current = surviving;
@@ -605,24 +644,32 @@ export default function VeniceGame() {
       if (removed.length > 0) {
         isProcessingCollisionRef.current = true;
 
-        // 지뢰로 제거된 단어는 점수 추가
-        const mineHits = removed.filter((word) =>
-          mines.some((mine) =>
-            Math.abs(word.x - mine.x) < 50 && Math.abs(word.y - mine.y) < 30
-          )
-        );
-        if (mineHits.length > 0) {
-          const mineScore = mineHits.reduce((sum, w) => sum + w.word.length * 5, 0);
-          setScore((prev) => prev + mineScore);
+        // 지뢰와 충돌로 제거된 단어들 (점수 추가, 벽돌 감소 없음)
+        const mineCollisions = removed.filter((word) => word.isMine);
+        const wordsHitMinesFiltered = removed.filter((word) => !word.isMine && wordsHitByMines.has(word.id));
+        const mineCollisionIds = new Set([...mineCollisions.map(w => w.id), ...wordsHitMinesFiltered.map(w => w.id)]);
+
+        if (mineCollisions.length > 0 || wordsHitMinesFiltered.length > 0) {
+          // 지뢰 폭파 소리 재생 (단어 제거 소리)
+          playCatchSound();
+
+          // 지뢰 단어 점수 + 충돌한 일반 단어 점수
+          const mineScore = mineCollisions.reduce((sum, w) => sum + w.word.length * 10, 0);
+          const wordScore = wordsHitMinesFiltered.reduce((sum, w) => sum + w.word.length * 10, 0);
+          const totalScore = mineScore + wordScore;
+
+          if (totalScore > 0) {
+            setScore((prev) => prev + totalScore);
+          }
         }
 
-        // 입력박스 또는 물결에 도달한 단어는 벽돌 감소
+        // 입력박스 또는 물결에 도달한 단어는 벽돌 감소 (지뢰 충돌로 제거된 단어는 제외)
         const damagingWords = removed.filter(
-          (w) => !w.isVirus || isAidsInfected
+          (w) => (!w.isVirus || isAidsInfected) && !mineCollisionIds.has(w.id)
         );
 
-        // 단어가 떨어졌을 때 소리 재생 (바이러스 포함, 게임 오버 예정이 아닐 때만)
-        if (removed.length > 0) {
+        // 일반 단어가 떨어졌을 때 소리 재생 (지뢰 충돌 제외, 게임 오버 예정이 아닐 때만)
+        if (damagingWords.length > 0) {
           const willGameOver = bricks - damagingWords.length <= 0;
           if (!willGameOver) {
             playBeep(250, 0.125);
@@ -689,7 +736,7 @@ export default function VeniceGame() {
 
         // 바이러스 단어인 경우 효과 발동
         if (matchedWord.isVirus) {
-          triggerVirusEffect(matchedWord.x, matchedWord.y);
+          triggerVirusEffect(matchedWord, matchedWord.forcedEffect);
         } else {
           // 일반 단어만 점수 추가
           const points = matchedWord.word.length * 10;
@@ -719,7 +766,6 @@ export default function VeniceGame() {
     setFallingWords([]);
     setInputValue("");
     nextWordIdRef.current = 0;
-    setMines([]);
     setIsFrozen(false);
     setSpeedMultiplier(1);
     setIsAidsInfected(false);
@@ -858,20 +904,6 @@ export default function VeniceGame() {
             </div>
           ))}
 
-          {/* Mines */}
-          {mines.map((mine, index) => (
-            <div
-              key={`mine-${index}`}
-              className="absolute"
-              style={{
-                left: mine.x,
-                top: mine.y,
-              }}
-            >
-              💣
-            </div>
-          ))}
-
           {/* Game Over Overlay with Rankings */}
           {gameOver && (
             <div className="absolute inset-0 flex items-center justify-center z-50">
@@ -940,7 +972,6 @@ export default function VeniceGame() {
                                 setFallingWords([]);
                                 setInputValue("");
                                 nextWordIdRef.current = 0;
-                                setMines([]);
                                 setIsFrozen(false);
                                 setSpeedMultiplier(1);
                                 setIsAidsInfected(false);
