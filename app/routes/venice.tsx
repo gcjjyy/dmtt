@@ -193,6 +193,8 @@ export default function VeniceGame() {
 
     if (waitingForStart && !gameStarted) {
       message = t("스페이스바를 눌러 시작하세요", "Press Space to Start");
+    } else if (isStageTransition) {
+      message = t("스페이스바를 눌러 계속", "Press Space to Continue");
     } else if (virusMessage) {
       message = virusMessage;
     }
@@ -201,7 +203,7 @@ export default function VeniceGame() {
 
     // Clear status message when component unmounts
     return () => setStatusMessage("");
-  }, [waitingForStart, gameStarted, virusMessage, isFrozen, isAidsInfected, t, setStatusMessage]);
+  }, [waitingForStart, gameStarted, virusMessage, isFrozen, isAidsInfected, isStageTransition, t, setStatusMessage]);
 
   // Game over animation: input box falling
   useEffect(() => {
@@ -641,7 +643,12 @@ export default function VeniceGame() {
     // 패거리 바이러스 활성화시 생성 속도 4배 (간격을 1/4로)
     const baseInterval = Math.max(2, 4 - level * 0.3); // 틱 단위
     const spawnInterval = isFloodActiveRef.current ? baseInterval / 4 : baseInterval;
-    if (spawnCounterRef.current >= spawnInterval) {
+
+    // 현재 단계의 최대 단어 생성 수 체크 (단계 전환 전까지만 생성)
+    const currentStageMaxWords = Math.floor(totalWordsProcessed / WORDS_PER_STAGE + 1) * WORDS_PER_STAGE;
+    const canSpawn = nextWordIdRef.current < currentStageMaxWords;
+
+    if (spawnCounterRef.current >= spawnInterval && canSpawn) {
       spawnNewWord();
       spawnCounterRef.current = 0;
     }
@@ -730,11 +737,9 @@ export default function VeniceGame() {
         if (removed.length > 0) {
           setTotalWordsProcessed((prev) => {
             const newTotal = prev + removed.length;
-            const currentStageWords = prev % WORDS_PER_STAGE;
-            const newStageWords = newTotal % WORDS_PER_STAGE;
 
-            // 단계 상승 조건 체크
-            if (currentStageWords < WORDS_PER_STAGE && newStageWords < currentStageWords) {
+            // 단계 상승 조건 체크 (WORDS_PER_STAGE 배수에 도달했을 때)
+            if (newTotal % WORDS_PER_STAGE === 0) {
               setLevel((prevLevel) => prevLevel + 1);
               setIsStageTransition(true);
             }
@@ -982,16 +987,11 @@ export default function VeniceGame() {
           {/* Stage Transition Overlay */}
           {isStageTransition && (
             <div className="absolute inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
-              <DosWindow title={t("단계 상승", "Stage Up")} className="w-80">
-                <div className="p-4 text-center">
-                  <div className="text-2xl font-bold text-black mb-4">
-                    {t(`단계 ${level}`, `Stage ${level}`)}
-                  </div>
-                  <div className="text-black">
-                    {t("스페이스바를 눌러 계속", "Press Space to Continue")}
-                  </div>
+              <div className="bg-white border-4 border-black px-8 py-6">
+                <div className="text-4xl font-bold text-black text-center">
+                  {t(`${level} 단계`, `Stage ${level}`)}
                 </div>
-              </DosWindow>
+              </div>
             </div>
           )}
 
