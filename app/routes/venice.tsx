@@ -72,10 +72,11 @@ export default function VeniceGame() {
   const spawnCounterRef = useRef(0);
   const isProcessingCollisionRef = useRef(false);
   const cachedSurvivingWordsRef = useRef<FallingWord[] | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   const GAME_WIDTH = 800;
   const GAME_HEIGHT = 528;
-  const WAVE_HEIGHT = 16;
+  const WAVE_HEIGHT = 19;
   const BRICK_HEIGHT = 64; // 4 rows × 16px
   const INPUT_HEIGHT = 48;
   const WAVE_TOP = GAME_HEIGHT - WAVE_HEIGHT; // 512
@@ -221,6 +222,36 @@ export default function VeniceGame() {
     }
 
     applyVirusEffect(selectedEffect, x, y);
+  };
+
+  const playBeep = () => {
+    try {
+      // GWBASIC SOUND 스타일: SOUND frequency, duration
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+
+      const audioContext = audioContextRef.current;
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      // 낮은 비프음: 150Hz (GWBASIC의 SOUND 150, 1 스타일)
+      oscillator.frequency.value = 150;
+      oscillator.type = 'square'; // 레트로한 사각파
+
+      const duration = 0.075; // 75ms
+      gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+      gainNode.gain.setValueAtTime(0.2, audioContext.currentTime + duration * 0.85); // flat하게 유지
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + duration);
+    } catch (e) {
+      console.error('Failed to play beep:', e);
+    }
   };
 
   const applyVirusEffect = (effect: VirusEffect, x: number, y: number) => {
@@ -413,6 +444,9 @@ export default function VeniceGame() {
         isProcessingCollisionRef.current = true;
         console.log(`📋 [gameLoop] 제거된 단어 처리 시작: ${removed.length}개`);
 
+        // 단어가 떨어질 때마다 비프음
+        playBeep();
+
         // 지뢰로 제거된 단어는 점수 추가
         const mineHits = removed.filter((word) =>
           mines.some((mine) =>
@@ -534,6 +568,18 @@ export default function VeniceGame() {
     setWordsMissed(0);
     setGameStartTime(Date.now());
     setWaitingForStart(false);
+
+    // AudioContext 미리 초기화 (딜레이 제거)
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+    } catch (err) {
+      console.error("Failed to initialize audio:", err);
+    }
 
     // Create practice session
     try {
@@ -713,9 +759,68 @@ export default function VeniceGame() {
 
           {/* Wave Layer */}
           <div
-            className="absolute w-full bg-blue-600 z-0"
+            className="absolute w-full z-0 overflow-hidden"
             style={{ bottom: 0, height: `${WAVE_HEIGHT}px` }}
-          />
+          >
+            <svg
+              className="absolute w-full h-full"
+              viewBox="0 0 800 19"
+              preserveAspectRatio="none"
+              style={{ display: 'block' }}
+            >
+              {/* 뒤쪽 파도 (어두운 파랑) */}
+              <path
+                d="M0,4 Q100,10 200,4 T400,4 T600,4 T800,4 L800,19 L0,19 Z"
+                fill="#2563eb"
+                opacity="0.85"
+              >
+                <animate
+                  attributeName="d"
+                  dur="3s"
+                  repeatCount="indefinite"
+                  values="
+                    M0,4 Q100,10 200,4 T400,4 T600,4 T800,4 L800,19 L0,19 Z;
+                    M0,4 Q100,0 200,4 T400,4 T600,4 T800,4 L800,19 L0,19 Z;
+                    M0,4 Q100,10 200,4 T400,4 T600,4 T800,4 L800,19 L0,19 Z
+                  "
+                />
+              </path>
+              {/* 중간 파도 (중간 파랑) */}
+              <path
+                d="M0,8 Q100,14 200,8 T400,8 T600,8 T800,8 L800,19 L0,19 Z"
+                fill="#3b82f6"
+                opacity="0.9"
+              >
+                <animate
+                  attributeName="d"
+                  dur="2s"
+                  repeatCount="indefinite"
+                  values="
+                    M0,8 Q100,14 200,8 T400,8 T600,8 T800,8 L800,19 L0,19 Z;
+                    M0,8 Q100,2 200,8 T400,8 T600,8 T800,8 L800,19 L0,19 Z;
+                    M0,8 Q100,14 200,8 T400,8 T600,8 T800,8 L800,19 L0,19 Z
+                  "
+                />
+              </path>
+              {/* 앞쪽 파도 (밝은 파랑) */}
+              <path
+                d="M0,12 Q100,15 200,12 T400,12 T600,12 T800,12 L800,19 L0,19 Z"
+                fill="#4e94f8"
+                opacity="0.95"
+              >
+                <animate
+                  attributeName="d"
+                  dur="2.5s"
+                  repeatCount="indefinite"
+                  values="
+                    M0,12 Q100,15 200,12 T400,12 T600,12 T800,12 L800,19 L0,19 Z;
+                    M0,12 Q100,9 200,12 T400,12 T600,12 T800,12 L800,19 L0,19 Z;
+                    M0,12 Q100,15 200,12 T400,12 T600,12 T800,12 L800,19 L0,19 Z
+                  "
+                />
+              </path>
+            </svg>
+          </div>
       </div>
     </div>
   );
