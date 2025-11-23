@@ -441,6 +441,20 @@ export default function VeniceGame() {
         console.log(`🔊 [${startTime + offset * 1000}] [${i + 1}번째 무너짐 사운드] ${offset * 1000}ms에 스케줄링`);
       }
 
+      // 마지막에 200Hz, 0.1초 추가 (4번째 무너짐 이후)
+      const finalOffset = 3 * 0.875 + 0.875; // 2625ms + 875ms = 3500ms
+      const osc4 = audioContext.createOscillator();
+      const gain4 = audioContext.createGain();
+      osc4.connect(gain4);
+      gain4.connect(audioContext.destination);
+      osc4.frequency.value = 200;
+      osc4.type = 'square';
+      gain4.gain.setValueAtTime(0.2, baseTime + finalOffset);
+      gain4.gain.setValueAtTime(0.2, baseTime + finalOffset + 0.1 * 0.85);
+      gain4.gain.exponentialRampToValueAtTime(0.01, baseTime + finalOffset + 0.1);
+      osc4.start(baseTime + finalOffset);
+      osc4.stop(baseTime + finalOffset + 0.1);
+
       console.log(`🔊 [사운드 스케줄링 완료] 4번 무너짐 사운드 모두 예약됨`);
     } catch (e) {
       console.error('Failed to play game over sound:', e);
