@@ -95,7 +95,7 @@ export default function VeniceGame() {
   const BRICK_TOP = GAME_HEIGHT - BRICK_HEIGHT; // 464
   const INPUT_TOP = GAME_HEIGHT - BRICK_HEIGHT - INPUT_HEIGHT; // 416
   const BASE_SPEED = 1;
-  const BASE_WORDS_PER_STAGE = 10; // 1단계 기준 단어 개수 (테스트용: 10, 실제: 50)
+  const BASE_WORDS_PER_STAGE = 30; // 1단계 기준 단어 개수
 
   // 단계별로 필요한 단어 수 계산 (난이도에 비례해서 증가)
   const getWordsForStage = (stage: number) => {
