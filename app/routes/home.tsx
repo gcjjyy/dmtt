@@ -20,7 +20,7 @@ interface Score {
 export async function loader() {
   try {
     // Fetch top 5 scores for each type
-    const shortScores = await sql<Score[]>`
+    const rawShortScores = await sql<Score[]>`
       SELECT id, name, type, score, created_at, extra
       FROM scores
       WHERE type = 'short'
@@ -28,7 +28,7 @@ export async function loader() {
       LIMIT 5
     `;
 
-    const longScores = await sql<Score[]>`
+    const rawLongScores = await sql<Score[]>`
       SELECT id, name, type, score, created_at, extra
       FROM scores
       WHERE type = 'long'
@@ -36,7 +36,7 @@ export async function loader() {
       LIMIT 5
     `;
 
-    const veniceScores = await sql<Score[]>`
+    const rawVeniceScores = await sql<Score[]>`
       SELECT id, name, type, score, created_at, extra
       FROM scores
       WHERE type = 'venice'
@@ -44,11 +44,17 @@ export async function loader() {
       LIMIT 5
     `;
 
+    // Parse extra field if it's a string
+    const parseExtra = (scores: Score[]) => scores.map(score => ({
+      ...score,
+      extra: typeof score.extra === 'string' ? JSON.parse(score.extra) : score.extra
+    }));
+
     return {
       rankings: {
-        short: shortScores,
-        long: longScores,
-        venice: veniceScores,
+        short: parseExtra(rawShortScores),
+        long: parseExtra(rawLongScores),
+        venice: parseExtra(rawVeniceScores),
       },
     };
   } catch (error) {

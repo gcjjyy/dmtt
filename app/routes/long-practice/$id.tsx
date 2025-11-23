@@ -25,7 +25,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export default function LongPracticeTyping() {
-  const { textData } = useLoaderData<typeof loader>();
+  const { textData, language } = useLoaderData<typeof loader>();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
@@ -153,10 +153,10 @@ export default function LongPracticeTyping() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // ESC를 누르면 홈으로
+    // ESC를 누르면 장문 선택 페이지로
     if (e.key === "Escape") {
       e.preventDefault();
-      navigate("/");
+      navigate(`/long-practice?lang=${language}`);
       return;
     }
 

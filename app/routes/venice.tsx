@@ -47,7 +47,7 @@ export default function VeniceGame() {
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
   const [bricks, setBricks] = useState(1);
-  const [level, setLevel] = useState(1);
+  const [stage, setStage] = useState(1);
   const [fallingWords, setFallingWords] = useState<FallingWord[]>([]);
   const [inputValue, setInputValue] = useState("");
   const nextWordIdRef = useRef(0);
@@ -167,9 +167,9 @@ export default function VeniceGame() {
       // Game loop interval - speed increases with stage
       // Stage 1: 600ms, Stage 8: 250ms, 9단계 이후: 10ms씩 감소 (최소 200ms)
       // speedMultiplier로 나눠서 속도 조절 (1.5 = 빠르게, 0.5 = 느리게)
-      const baseDelay = level <= 8
-        ? 600 - (level - 1) * (350 / 7)           // 1단계: 600ms, 8단계: 250ms (선형 보간)
-        : Math.max(200, 250 - (level - 8) * 10);  // 9단계 이후: 10ms씩 감소, 최소 200ms
+      const baseDelay = stage <= 8
+        ? 600 - (stage - 1) * (350 / 7)           // 1단계: 600ms, 8단계: 250ms (선형 보간)
+        : Math.max(200, 250 - (stage - 8) * 10);  // 9단계 이후: 10ms씩 감소, 최소 200ms
       const loopDelay = baseDelay / speedMultiplier;
       gameLoopIntervalRef.current = setInterval(() => {
         gameLoop();
@@ -186,7 +186,7 @@ export default function VeniceGame() {
         clearInterval(gameLoopIntervalRef.current);
       }
     }
-  }, [gameStarted, gameOver, isGameOverAnimating, level, speedMultiplier, isFrozen, isStageTransition]);
+  }, [gameStarted, gameOver, isGameOverAnimating, stage, speedMultiplier, isFrozen, isStageTransition]);
 
   // Submit score when game is over
   useEffect(() => {
@@ -209,7 +209,7 @@ export default function VeniceGame() {
             type: "venice",
             score: score,
             accuracy: finalAccuracy,
-            level: level,
+            level: stage,
             wordsCaught: wordsCaught,
             wordsMissed: wordsMissed,
             gameDuration: gameDuration,
@@ -222,7 +222,7 @@ export default function VeniceGame() {
     };
 
     submitScore();
-  }, [gameOver, sessionToken, gameStartTime, score, bricks, level, wordsCaught, wordsMissed]);
+  }, [gameOver, sessionToken, gameStartTime, score, bricks, stage, wordsCaught, wordsMissed]);
 
   // Update status bar message
   useEffect(() => {
@@ -314,9 +314,9 @@ export default function VeniceGame() {
     const x = Math.floor(Math.random() * (range / 8)) * 8 + minX;
 
     // 1단계(0.8) ~ 4단계(6.4) 선형 보간, 이후 급격히 가속
-    const speedIncrease = level <= 4
-      ? 0.8 + (level - 1) * (5.6 / 3)   // 1단계: 0.8, 4단계: 6.4
-      : 6.4 + (level - 4) * 2.5;         // 5단계 이후는 2.5씩 증가
+    const speedIncrease = stage <= 4
+      ? 0.8 + (stage - 1) * (5.6 / 3)   // 1단계: 0.8, 4단계: 6.4
+      : 6.4 + (stage - 4) * 2.5;         // 5단계 이후는 2.5씩 증가
 
     const newWord: FallingWord = {
       id: nextWordIdRef.current,
@@ -531,7 +531,7 @@ export default function VeniceGame() {
 
             if (newStage > currentStage) {
               console.log(`🔥 [싹쓸이] 단계 상승 트리거! ${prevTotal} → ${newTotal}개 처리 완료 → 단계 ${currentStage} → ${newStage}`);
-              setLevel(newStage);
+              setStage(newStage);
               setIsStageTransition(true);
               // input에서 포커스 제거 (다음 틱에 실행)
               setTimeout(() => {
@@ -707,7 +707,7 @@ export default function VeniceGame() {
     // 1. 단어 생성 (카운터 기반)
     spawnCounterRef.current += 1;
     // 패거리 바이러스 활성화시 생성 속도 4배 (간격을 1/4로)
-    const baseInterval = Math.max(1, 2.305 - level * 0.163); // 1단계: 2.142틱, 8단계 이상: 1틱
+    const baseInterval = Math.max(1, 2.305 - stage * 0.163); // 1단계: 2.142틱, 8단계 이상: 1틱
     const spawnInterval = isFloodActiveRef.current ? baseInterval / 4 : baseInterval;
 
     // 현재 단계의 최대 단어 생성 수 체크 (단계 전환 전까지만 생성)
@@ -757,9 +757,9 @@ export default function VeniceGame() {
           // 지뢰 폭파 소리 재생 (단어 제거 소리)
           playCatchSound();
 
-          // 지뢰 단어 점수 + 충돌한 일반 단어 점수
-          const mineScore = mineCollisions.reduce((sum, w) => sum + w.word.length * 10, 0);
-          const wordScore = wordsHitMinesFiltered.reduce((sum, w) => sum + w.word.length * 10, 0);
+          // 지뢰 단어 점수 + 충돌한 일반 단어 점수 (글자수 × 10 × 현재 단계)
+          const mineScore = mineCollisions.reduce((sum, w) => sum + w.word.length * 10 * stage, 0);
+          const wordScore = wordsHitMinesFiltered.reduce((sum, w) => sum + w.word.length * 10 * stage, 0);
           const totalScore = mineScore + wordScore;
 
           if (totalScore > 0) {
@@ -823,7 +823,7 @@ export default function VeniceGame() {
 
             if (newStage > currentStage) {
               console.log(`🔥 [충돌체크] 단계 상승 트리거! ${prev} → ${newTotal}개 처리 완료 → 단계 ${currentStage} → ${newStage}`);
-              setLevel(newStage);
+              setStage(newStage);
               setIsStageTransition(true);
               // input에서 포커스 제거 (다음 틱에 실행)
               setTimeout(() => {
@@ -887,8 +887,8 @@ export default function VeniceGame() {
         if (matchedWord.isVirus) {
           triggerVirusEffect(matchedWord, matchedWord.forcedEffect);
         } else {
-          // 일반 단어만 점수 추가
-          const points = matchedWord.word.length * 10;
+          // 일반 단어만 점수 추가 (글자수 × 10 × 현재 단계)
+          const points = matchedWord.word.length * 10 * stage;
           setScore((prev) => prev + points);
         }
 
@@ -904,7 +904,7 @@ export default function VeniceGame() {
 
           if (newStage > currentStage) {
             console.log(`🔥 [사용자입력] 단계 상승 트리거! ${prev} → ${newTotal}개 처리 완료 → 단계 ${currentStage} → ${newStage}`);
-            setLevel(newStage);
+            setStage(newStage);
             setIsStageTransition(true);
             // input에서 포커스 제거 (다음 틱에 실행)
             setTimeout(() => {
@@ -931,7 +931,7 @@ export default function VeniceGame() {
     setGameOver(false);
     setScore(0);
     setBricks(1);
-    setLevel(1);
+    setStage(1);
     setFallingWords([]);
     setInputValue("");
     nextWordIdRef.current = 0;
@@ -1058,7 +1058,7 @@ export default function VeniceGame() {
       >
           {/* Score and Stage Display */}
           <div className="absolute -top-2 left-1/2 bg-[#008080] transform -translate-x-1/2 text-black leading-4 z-10">
-            {t("단계", "Stage")}: {level}  {t("점수", "Score")}: {score}
+            {t("단계", "Stage")}: {stage}  {t("점수", "Score")}: {score}
           </div>
 
           {/* Falling Words */}
@@ -1159,7 +1159,7 @@ export default function VeniceGame() {
                                 setGameStarted(false);
                                 setScore(0);
                                 setBricks(12);
-                                setLevel(1);
+                                setStage(1);
                                 setFallingWords([]);
                                 setInputValue("");
                                 nextWordIdRef.current = 0;
@@ -1364,7 +1364,7 @@ export default function VeniceGame() {
                     textAlign: 'center',
                   }}
                 >
-                  {t(`${level} 단계`, `Stage ${level}`)}
+                  {t(`${stage} 단계`, `Stage ${stage}`)}
                 </div>
               </div>
             </div>

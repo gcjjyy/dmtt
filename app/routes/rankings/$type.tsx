@@ -52,7 +52,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   try {
     // Fetch all scores for this type and time period
-    const scores = await sql<Score[]>`
+    const rawScores = await sql<Score[]>`
       SELECT id, name, type, score, created_at, extra
       FROM scores
       WHERE type = ${type}
@@ -60,6 +60,17 @@ export async function loader({ params, request }: Route.LoaderArgs) {
         AND EXTRACT(MONTH FROM created_at) = ${month}
       ORDER BY score DESC
     `;
+
+    // Parse extra field if it's a string
+    const scores = rawScores.map(score => ({
+      ...score,
+      extra: typeof score.extra === 'string' ? JSON.parse(score.extra) : score.extra
+    }));
+
+    // Debug: Log first score to check extra field
+    if (scores.length > 0) {
+      console.log("First score:", JSON.stringify(scores[0], null, 2));
+    }
 
     return { scores, type, year, month, currentYear, currentMonth };
   } catch (error) {
