@@ -56,6 +56,7 @@ export default function VeniceGame() {
   const [speedMultiplier, setSpeedMultiplier] = useState(1);
   const [isAidsInfected, setIsAidsInfected] = useState(false);
   const [isHideActive, setIsHideActive] = useState(false);
+  const [isFloodActive, setIsFloodActive] = useState(false);
   const [virusMessage, setVirusMessage] = useState<string | null>(null);
   const [isGameOverAnimating, setIsGameOverAnimating] = useState(false);
   const [inputBoxFallCount, setInputBoxFallCount] = useState(0);
@@ -80,6 +81,7 @@ export default function VeniceGame() {
   const isGameOverAnimatingRef = useRef(false);
   const fallCountRef = useRef(0);
   const isHideActiveRef = useRef(false);
+  const isFloodActiveRef = useRef(false);
 
   const GAME_WIDTH = 800;
   const GAME_HEIGHT = 528;
@@ -256,7 +258,7 @@ export default function VeniceGame() {
 
   const spawnNewWord = () => {
     const randomWord = words[Math.floor(Math.random() * words.length)];
-    // 테스트: 4번째 단어(id=3)를 숨바꼭질 바이러스로 강제
+    // 테스트: 4번째 단어(id=3)를 패거리 바이러스로 강제
     const isVirus = nextWordIdRef.current === 3 ? true : Math.random() < 0.15;
 
     // 단어 너비 계산
@@ -276,8 +278,8 @@ export default function VeniceGame() {
       speed: (BASE_SPEED + level * 0.2) * speedMultiplier,
       isVirus,
       isHidden: isHideActiveRef.current,
-      // 테스트: 4번째 단어는 강제로 hide 효과
-      forcedEffect: nextWordIdRef.current === 3 ? "hide" : undefined,
+      // 테스트: 4번째 단어는 강제로 flood 효과
+      forcedEffect: nextWordIdRef.current === 3 ? "flood" : undefined,
     };
 
     nextWordIdRef.current += 1;
@@ -508,19 +510,12 @@ export default function VeniceGame() {
 
       case "flood":
         setVirusMessage(t("패거리 바이러스!", "Flood Virus!"));
-        const newWords: FallingWord[] = [];
-        for (let i = 0; i < 10; i++) {
-          const randomWord = words[Math.floor(Math.random() * words.length)];
-          newWords.push({
-            id: nextWordIdRef.current + i,
-            word: randomWord,
-            x: Math.random() * (GAME_WIDTH - 100),
-            y: -i * 30,
-            speed: (BASE_SPEED + level * 0.2) * speedMultiplier,
-          });
-        }
-        nextWordIdRef.current += 10;
-        setFallingWords((prev) => [...prev, ...newWords]);
+        setIsFloodActive(true);
+        isFloodActiveRef.current = true;
+        setTimeout(() => {
+          setIsFloodActive(false);
+          isFloodActiveRef.current = false;
+        }, 10000); // 10초 동안 2배 속도로 생성
         break;
 
       case "mine":
@@ -632,7 +627,9 @@ export default function VeniceGame() {
 
     // 1. 단어 생성 (카운터 기반)
     spawnCounterRef.current += 1;
-    const spawnInterval = Math.max(2, 4 - level * 0.3); // 틱 단위
+    // 패거리 바이러스 활성화시 생성 속도 4배 (간격을 1/4로)
+    const baseInterval = Math.max(2, 4 - level * 0.3); // 틱 단위
+    const spawnInterval = isFloodActiveRef.current ? baseInterval / 4 : baseInterval;
     if (spawnCounterRef.current >= spawnInterval) {
       spawnNewWord();
       spawnCounterRef.current = 0;
@@ -685,8 +682,11 @@ export default function VeniceGame() {
           (w) => (!w.isVirus || isAidsInfected) && !mineCollisionIds.has(w.id)
         );
 
-        // 일반 단어가 떨어졌을 때 소리 재생 (지뢰 충돌 제외, 게임 오버 예정이 아닐 때만)
-        if (damagingWords.length > 0) {
+        // 떨어진 모든 단어 (지뢰 충돌 제외) - 소리용
+        const allFallenWords = removed.filter((w) => !mineCollisionIds.has(w.id));
+
+        // 단어가 떨어졌을 때 소리 재생 (지뢰 충돌 제외, 게임 오버 예정이 아닐 때만)
+        if (allFallenWords.length > 0) {
           const willGameOver = bricks - damagingWords.length <= 0;
           if (!willGameOver) {
             playBeep(250, 0.125);
@@ -735,8 +735,8 @@ export default function VeniceGame() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // 스페이스바로 단어 제출
-    if (e.key === " " || e.code === "Space") {
+    // 스페이스바 또는 엔터로 단어 제출
+    if (e.key === " " || e.code === "Space" || e.key === "Enter") {
       e.preventDefault();
 
       const value = inputValue.trim();
@@ -1013,6 +1013,9 @@ export default function VeniceGame() {
                                 setSpeedMultiplier(1);
                                 setIsAidsInfected(false);
                                 setIsHideActive(false);
+                                setIsFloodActive(false);
+                                isHideActiveRef.current = false;
+                                isFloodActiveRef.current = false;
                                 setVirusMessage(null);
                                 setWordsCaught(0);
                                 setWordsMissed(0);
