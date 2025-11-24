@@ -855,8 +855,8 @@ export default function VeniceGame() {
       const value = inputValue.trim();
       if (!value) return;
 
-      // Check if any word matches
-      const matchedWord = fallingWords.find((w) => w.word === value);
+      // Check if any word matches (지뢰는 제외)
+      const matchedWord = fallingWords.find((w) => w.word === value && !w.isMine);
       if (matchedWord) {
         // 중복 처리 방지 (Strict Mode 대응)
         if (lastProcessedWordIdRef.current === matchedWord.id) {
