@@ -17,7 +17,7 @@ export function DosWindow({ title, children, className = "" }: DosWindowProps) {
         </div>
 
         {/* Inner Sunken Box */}
-        <div className="flex-1 mx-1.5 my-1.5 border border-t-[#808080] border-l-[#808080] border-b-white border-r-white bg-[#C0C0C0]">
+        <div className="flex-1 mx-1.5 my-1.5 border border-t-[#808080] border-l-[#808080] border-b-white border-r-white bg-[#C0C0C0] overflow-hidden">
           {children}
         </div>
       </div>

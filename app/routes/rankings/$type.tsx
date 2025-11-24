@@ -148,7 +148,7 @@ export default function Rankings() {
   );
 
   return (
-    <div className="w-full h-full bg-[#008080] flex flex-col items-center justify-center p-4 gap-2">
+    <div className="w-full h-full bg-[#008080] flex flex-col items-center p-4 gap-2">
       {/* Tab Bar and Date Navigator Row */}
       <div className="flex gap-2">
         {/* Type Selector Buttons - 70% */}
@@ -217,7 +217,7 @@ export default function Rankings() {
       {/* Rankings Window */}
       <DosWindow
         title={`${title} ${t("랭킹", "Rankings")} - ${year}${t("년", "")} ${monthName}`}
-        className="w-full h-full"
+        className="w-full h-[460px]"
       >
         {scores.length === 0 ? (
           <div className="p-12 text-center">
@@ -227,9 +227,9 @@ export default function Rankings() {
             </p>
           </div>
         ) : (
-          <div className="px-2 py-1.5 overflow-y-auto">
+          <div className="px-2 py-1.5 overflow-y-auto h-full">
             {/* Table Header */}
-            <div className="flex items-center gap-2 px-1 text-black pb-0.5 sticky top-0 bg-[#C0C0C0]">
+            <div className="flex items-center gap-2 px-1 text-black pb-0.5 bg-[#C0C0C0]">
               <div className="w-6"></div>
               <div className="flex-1">{t("이름", "Name")}</div>
               <div className="w-20 text-right">
