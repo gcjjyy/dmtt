@@ -19,6 +19,7 @@ export default function MainLayout() {
   const [openMenu, setOpenMenu] = useState<MenuKey>(null);
   const [username, setUsername] = useState("");
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
+  const [isMouseMode, setIsMouseMode] = useState(false); // 마우스 사용 모드 감지
   const menuBarRef = useRef<HTMLDivElement>(null);
 
   const isHomePage = location.pathname === '/';
@@ -46,6 +47,27 @@ export default function MainLayout() {
     return `${hours}:${minutes}:${seconds}`;
   };
 
+  // Detect mouse mode (마우스 사용 감지)
+  useEffect(() => {
+    const handleMouseMove = () => {
+      if (!isMouseMode) {
+        setIsMouseMode(true);
+      }
+    };
+
+    const handleKeyDown = () => {
+      setIsMouseMode(false);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove, { once: true });
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMouseMode]);
+
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -64,6 +86,13 @@ export default function MainLayout() {
       setOpenMenu(null);
     } else {
       setOpenMenu(openMenu === menuKey ? null : menuKey);
+    }
+  };
+
+  const handleMenuHover = (menuKey: MenuKey, hasItems: boolean) => {
+    // 마우스 모드이고 서브메뉴가 있는 경우에만 hover로 메뉴 열기
+    if (isMouseMode && hasItems) {
+      setOpenMenu(menuKey);
     }
   };
 
@@ -130,6 +159,7 @@ export default function MainLayout() {
             <div key={menu.key} className="relative">
               <div
                 onClick={() => handleMenuClick(menu.key, menu.items.length === 0 ? menu.path : undefined)}
+                onMouseEnter={() => handleMenuHover(menu.key, menu.items.length > 0)}
                 className={`px-1 flex items-center cursor-pointer border ${
                   openMenu === menu.key
                     ? "h-[19px] bg-black text-white border-black"

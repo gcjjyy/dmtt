@@ -93,7 +93,7 @@ export default function Home() {
   };
 
   return (
-    <div className="w-full h-full bg-[#008080] px-4 pb-12 relative flex flex-col items-center justify-center">
+    <div className="w-full h-full bg-[#008080] px-4 pb-4 relative flex flex-col items-center justify-center">
       {/* Title */}
       <div className="text-center text-white mb-4">
         {t(`이번 달(${monthNames.ko[currentMonth - 1]}) 랭킹`, `This Month (${monthNames.en[currentMonth - 1]}) Rankings`)}
@@ -145,6 +145,18 @@ export default function Home() {
             </DosWindow>
           );
         })}
+      </div>
+
+      {/* 도스박물관 링크 */}
+      <div className="mt-4 text-center">
+        <a
+          href="https://cafe.naver.com/olddos"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[#00FFFF] hover:underline"
+        >
+          도스박물관 - 도스시대의 추억을 간직하는 곳
+        </a>
       </div>
     </div>
   );
