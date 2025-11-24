@@ -85,6 +85,7 @@ export default function VeniceGame() {
   const isFloodActiveRef = useRef(false);
   const lastProcessedWordIdRef = useRef(-1); // 마지막 처리한 단어 ID (중복 방지)
   const totalWordsProcessedRef = useRef(0); // 처리된 단어 수 (게임 루프에서 사용)
+  const isStageTransitionRef = useRef(false); // 단계 전환 상태 (클로저 문제 방지)
 
   const GAME_WIDTH = 800;
   const GAME_HEIGHT = 528;
@@ -95,7 +96,7 @@ export default function VeniceGame() {
   const BRICK_TOP = GAME_HEIGHT - BRICK_HEIGHT; // 464
   const INPUT_TOP = GAME_HEIGHT - BRICK_HEIGHT - INPUT_HEIGHT; // 416
   const BASE_SPEED = 1;
-  const BASE_WORDS_PER_STAGE = 30; // 1단계 기준 단어 개수
+  const BASE_WORDS_PER_STAGE = 10; // 1단계 기준 단어 개수
 
   // 단계별로 필요한 단어 수 계산 (난이도에 비례해서 증가)
   const getWordsForStage = (stage: number) => {
@@ -128,6 +129,11 @@ export default function VeniceGame() {
     return { stage, accumulated };
   };
 
+  // Sync isStageTransition to ref (클로저 문제 방지)
+  useEffect(() => {
+    isStageTransitionRef.current = isStageTransition;
+  }, [isStageTransition]);
+
   // Spacebar handler to start game or resume from stage transition
   useEffect(() => {
     const handleSpace = (e: KeyboardEvent) => {
@@ -138,11 +144,10 @@ export default function VeniceGame() {
         }
 
         // 단계 전환 중이면 재개 (게임 시작 포함)
-        if (isStageTransition) {
+        if (isStageTransitionRef.current) {
           e.preventDefault();
           if (!gameStarted) {
             startGame();
-          } else {
           }
           setIsStageTransition(false);
         }
@@ -150,7 +155,19 @@ export default function VeniceGame() {
     };
     window.addEventListener("keydown", handleSpace);
     return () => window.removeEventListener("keydown", handleSpace);
-  }, [gameStarted, isStageTransition]);
+  }, [gameStarted]);
+
+  // Auto-close stage transition popup after 2 seconds
+  useEffect(() => {
+    if (isStageTransition && gameStarted) {
+      const timer = setTimeout(() => {
+        setIsStageTransition(false);
+        inputRef.current?.focus();
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isStageTransition, gameStarted]);
 
   useEffect(() => {
     if (gameStarted && !gameOver && !isGameOverAnimating && !isFrozen && !isStageTransition) {
