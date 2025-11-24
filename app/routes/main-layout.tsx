@@ -89,6 +89,13 @@ export default function MainLayout() {
     }
   };
 
+  const handleMenuHover = (menuKey: MenuKey, hasSubMenu: number) => {
+    // 이미 메뉴가 열려있고, 서브메뉴가 있는 메뉴에 hover한 경우에만 전환
+    if (openMenu !== null && hasSubMenu > 0) {
+      setOpenMenu(menuKey);
+    }
+  };
+
   const handleMenuItemClick = (path: string) => {
     navigate(path);
     setOpenMenu(null);
@@ -152,6 +159,7 @@ export default function MainLayout() {
             <div key={menu.key} className="relative">
               <div
                 onClick={() => handleMenuClick(menu.key, menu.items.length === 0 ? menu.path : undefined)}
+                onMouseEnter={() => handleMenuHover(menu.key, menu.items.length)}
                 className={`px-1 flex items-center cursor-pointer border ${
                   openMenu === menu.key
                     ? "h-[19px] bg-black text-white border-black"
