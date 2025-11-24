@@ -71,8 +71,8 @@ export async function loader() {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "타자 연습 | Typing Practice" },
-    { name: "description", content: "한글/영문 타자 연습 프로그램" },
+    { title: "도·박타자교사" },
+    { name: "description", content: "도스박물관 한글/영문 타자 연습 프로그램" },
   ];
 }
 
