@@ -96,7 +96,7 @@ export default function VeniceGame() {
   const BRICK_TOP = GAME_HEIGHT - BRICK_HEIGHT; // 464
   const INPUT_TOP = GAME_HEIGHT - BRICK_HEIGHT - INPUT_HEIGHT; // 416
   const BASE_SPEED = 1;
-  const BASE_WORDS_PER_STAGE = 10; // 1단계 기준 단어 개수
+  const BASE_WORDS_PER_STAGE = 30; // 1단계 기준 단어 개수
 
   // 단계별로 필요한 단어 수 계산 (난이도에 비례해서 증가)
   const getWordsForStage = (stage: number) => {
@@ -134,7 +134,7 @@ export default function VeniceGame() {
     isStageTransitionRef.current = isStageTransition;
   }, [isStageTransition]);
 
-  // Spacebar handler to start game or resume from stage transition
+  // Spacebar handler to start game
   useEffect(() => {
     const handleSpace = (e: KeyboardEvent) => {
       if (e.code === "Space") {
@@ -143,12 +143,10 @@ export default function VeniceGame() {
           return;
         }
 
-        // 단계 전환 중이면 재개 (게임 시작 포함)
-        if (isStageTransitionRef.current) {
+        // 게임 시작 전에만 스페이스바로 시작
+        if (isStageTransitionRef.current && !gameStarted) {
           e.preventDefault();
-          if (!gameStarted) {
-            startGame();
-          }
+          startGame();
           setIsStageTransition(false);
         }
       }
@@ -157,13 +155,13 @@ export default function VeniceGame() {
     return () => window.removeEventListener("keydown", handleSpace);
   }, [gameStarted]);
 
-  // Auto-close stage transition popup after 2 seconds
+  // Auto-close stage transition popup after 3 seconds
   useEffect(() => {
     if (isStageTransition && gameStarted) {
       const timer = setTimeout(() => {
         setIsStageTransition(false);
         inputRef.current?.focus();
-      }, 2000);
+      }, 3000);
 
       return () => clearTimeout(timer);
     }
@@ -245,10 +243,9 @@ export default function VeniceGame() {
   useEffect(() => {
     let message = "";
 
-    if (isStageTransition) {
-      message = !gameStarted
-        ? t("스페이스바를 눌러 시작하세요", "Press Space to Start")
-        : t("스페이스바를 눌러 계속", "Press Space to Continue");
+    if (isStageTransition && !gameStarted) {
+      // 게임 시작 전에만 스페이스바 안내 표시
+      message = t("스페이스바를 눌러 시작하세요", "Press Space to Start");
     } else if (virusMessage) {
       message = virusMessage;
     }
@@ -546,12 +543,6 @@ export default function VeniceGame() {
             if (newStage > currentStage) {
               setStage(newStage);
               setIsStageTransition(true);
-              // input에서 포커스 제거 (다음 틱에 실행)
-              setTimeout(() => {
-                if (inputRef.current) {
-                  inputRef.current.blur();
-                }
-              }, 0);
             }
 
             return newTotal;
@@ -832,12 +823,6 @@ export default function VeniceGame() {
             if (newStage > currentStage) {
               setStage(newStage);
               setIsStageTransition(true);
-              // input에서 포커스 제거 (다음 틱에 실행)
-              setTimeout(() => {
-                if (inputRef.current) {
-                  inputRef.current.blur();
-                }
-              }, 0);
             }
 
             return newTotal;
@@ -910,12 +895,6 @@ export default function VeniceGame() {
           if (newStage > currentStage) {
             setStage(newStage);
             setIsStageTransition(true);
-            // input에서 포커스 제거 (다음 틱에 실행)
-            setTimeout(() => {
-              if (inputRef.current) {
-                inputRef.current.blur();
-              }
-            }, 0);
           }
 
           return newTotal;
