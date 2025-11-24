@@ -21,6 +21,7 @@ export default function MainLayout() {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [isMouseMode, setIsMouseMode] = useState(false); // 마우스 사용 모드 감지
   const menuBarRef = useRef<HTMLDivElement>(null);
+  const menuContainerRef = useRef<HTMLDivElement>(null);
 
   const isHomePage = location.pathname === '/';
 
@@ -71,7 +72,7 @@ export default function MainLayout() {
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (menuBarRef.current && !menuBarRef.current.contains(event.target as Node)) {
+      if (menuContainerRef.current && !menuContainerRef.current.contains(event.target as Node)) {
         setOpenMenu(null);
       }
     };
@@ -155,6 +156,7 @@ export default function MainLayout() {
           ref={menuBarRef}
           className="bg-white h-5 flex relative border-b border-black pl-2 z-10"
         >
+          <div ref={menuContainerRef} className="flex">
           {menuItems.map((menu) => (
             <div key={menu.key} className="relative">
               <div
@@ -185,6 +187,7 @@ export default function MainLayout() {
               )}
             </div>
           ))}
+          </div>
         </div>
 
         {/* Main Content Area */}
