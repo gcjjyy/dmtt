@@ -89,13 +89,6 @@ export default function MainLayout() {
     }
   };
 
-  const handleMenuHover = (menuKey: MenuKey, hasItems: boolean) => {
-    // 마우스 모드이고 서브메뉴가 있는 경우에만 hover로 메뉴 열기
-    if (isMouseMode && hasItems) {
-      setOpenMenu(menuKey);
-    }
-  };
-
   const handleMenuItemClick = (path: string) => {
     navigate(path);
     setOpenMenu(null);
@@ -159,11 +152,10 @@ export default function MainLayout() {
             <div key={menu.key} className="relative">
               <div
                 onClick={() => handleMenuClick(menu.key, menu.items.length === 0 ? menu.path : undefined)}
-                onMouseEnter={() => handleMenuHover(menu.key, menu.items.length > 0)}
                 className={`px-1 flex items-center cursor-pointer border ${
                   openMenu === menu.key
                     ? "h-[19px] bg-black text-white border-black"
-                    : "h-[18px] bg-white text-black border-transparent"
+                    : "h-[18px] bg-white text-black border-transparent hover:h-[19px] hover:bg-black hover:text-white"
                 }`}
               >
                 {menu.label}

@@ -105,8 +105,12 @@ export default function Home() {
           const scores = rankings[typeKey];
 
           return (
-            <DosWindow key={type.key} title={type.title} className="h-[380px]">
-              <div className="p-2 flex flex-col h-full">
+            <DosWindow
+              key={type.key}
+              title={type.title}
+              className="h-[380px]"
+            >
+              <div className="px-2 py-1.5 flex flex-col h-full">
                 {scores.length === 0 ? (
                   <div className="text-center py-4 text-black flex-1 flex items-center justify-center">
                     {t("아직 기록이 없습니다", "No records yet")}
@@ -114,30 +118,62 @@ export default function Home() {
                 ) : (
                   <div className="flex-1">
                     {/* Header */}
-                    <div className="flex items-center gap-2 px-1 text-black border-b border-[#808080] pb-1 mb-1">
-                      <div className="w-6">#</div>
+                    <div className="flex items-center gap-2 px-1 text-black pb-0.5">
+                      <div className="w-6"></div>
                       <div className="flex-1">{t("이름", "Name")}</div>
-                      <div className="w-16 text-right">{t("타수", "CPM")}</div>
+                      <div className={typeKey === "venice" ? "w-12 text-right" : "w-10 text-right"}>
+                        {typeKey === "venice" ? t("점수", "Score") : t("타수", "CPM")}
+                      </div>
+                    </div>
+                    {/* Separator Line */}
+                    <div className="mb-1">
+                      <div className="border-b border-[#808080]"></div>
+                      <div className="border-b border-white"></div>
                     </div>
                     {/* Scores */}
-                    <div className="space-y-0.5">
-                      {scores.map((score, index) => (
-                        <div
-                          key={score.id}
-                          className={`flex items-center gap-2 px-1 text-black ${index === 0 ? "bg-[#FFFF00]" : ""}`}
-                        >
-                          <div className="w-6">{index + 1}</div>
-                          <div className="flex-1 truncate">{score.name}</div>
-                          <div className="w-16 text-right">{score.score.toLocaleString()}</div>
-                        </div>
-                      ))}
+                    <div>
+                      {scores.map((score, index) => {
+                        const getRankStyle = (rank: number) => {
+                          if (rank === 0) return {
+                            background: "linear-gradient(135deg, #FFF176 0%, #FFD700 50%, #FFC947 100%)"
+                          }; // 금색 그라데이션 (중간)
+                          if (rank === 1) return {
+                            background: "linear-gradient(135deg, #F5F5F5 0%, #EEEEEE 50%, #E0E0E0 100%)"
+                          }; // 은색 그라데이션 (중간)
+                          if (rank === 2) return {
+                            background: "linear-gradient(135deg, #FFCC80 0%, #FFB74D 50%, #FFA726 100%)"
+                          }; // 동색 그라데이션 (중간)
+                          return {};
+                        };
+
+                        const getRankDisplay = (rank: number) => {
+                          if (rank === 0) return "🥇";
+                          if (rank === 1) return "🥈";
+                          if (rank === 2) return "🥉";
+                          return `${rank + 1}`;
+                        };
+
+                        return (
+                          <div
+                            key={score.id}
+                            className={`flex items-center gap-2 px-1 text-black`}
+                            style={getRankStyle(index)}
+                          >
+                            <div className="w-6 text-center">{getRankDisplay(index)}</div>
+                            <div className="flex-1 truncate">{score.name}</div>
+                            <div className={typeKey === "venice" ? "w-12 text-right" : "w-10 text-right"}>
+                              {score.score.toLocaleString()}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
 
                 <Link
                   to={`/rankings/${type.key}`}
-                  className="block mt-2 text-center text-black border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-[#C0C0C0] hover:bg-[#D0D0D0] py-0.5"
+                  className="block mt-1 text-center text-black border-2 border-t-white border-l-white border-b-[#808080] border-r-[#808080] bg-[#C0C0C0] hover:bg-[#D0D0D0] py-0.5"
                 >
                   {t("전체 보기", "View All")}
                 </Link>

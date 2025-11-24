@@ -227,93 +227,120 @@ export default function Rankings() {
             </p>
           </div>
         ) : (
-          <div className="p-2 overflow-y-auto">
+          <div className="px-2 py-1.5 overflow-y-auto">
             {/* Table Header */}
-            <div className="flex border-b-2 border-black pb-1 mb-2 sticky top-0 bg-[#C0C0C0]">
-              <div className="w-12 text-black">#</div>
-              <div className="flex-1 text-black">{t("이름", "Name")}</div>
-              <div className="w-20 text-black text-right">
+            <div className="flex items-center gap-2 px-1 text-black pb-0.5 sticky top-0 bg-[#C0C0C0]">
+              <div className="w-6"></div>
+              <div className="flex-1">{t("이름", "Name")}</div>
+              <div className="w-20 text-right">
                 {type === "short" || type === "long" ? t("타수", "CPM") : t("점수", "Score")}
               </div>
               {type !== "venice" && (
-                <div className="w-20 text-black text-right">{t("정확도", "Accuracy")}</div>
+                <div className="w-20 text-right">{t("정확도", "Accuracy")}</div>
               )}
 
               {/* Mode-specific columns */}
               {type === "short" && (
                 <>
-                  <div className="w-20 text-black text-right">{t("WPM", "WPM")}</div>
-                  <div className="w-20 text-black text-right">{t("문장수", "Sentences")}</div>
+                  <div className="w-20 text-right">{t("WPM", "WPM")}</div>
+                  <div className="w-20 text-right">{t("문장수", "Sentences")}</div>
                 </>
               )}
 
               {type === "long" && (
                 <>
-                  <div className="w-16 text-black text-right">{t("등급", "Grade")}</div>
-                  <div className="w-20 text-black text-right">{t("WPM", "WPM")}</div>
-                  <div className="w-20 text-black text-right">{t("줄수", "Lines")}</div>
+                  <div className="w-16 text-right">{t("등급", "Grade")}</div>
+                  <div className="w-20 text-right">{t("WPM", "WPM")}</div>
+                  <div className="w-20 text-right">{t("줄수", "Lines")}</div>
                 </>
               )}
 
               {type === "venice" && (
-                <div className="w-16 text-black text-right">{t("단계", "Stage")}</div>
+                <div className="w-16 text-right">{t("단계", "Stage")}</div>
               )}
 
-              <div className="w-20 text-black text-right">{t("날짜", "Date")}</div>
+              <div className="w-20 text-right">{t("날짜", "Date")}</div>
+            </div>
+
+            {/* Separator Line */}
+            <div className="mb-1">
+              <div className="border-b border-[#808080]"></div>
+              <div className="border-b border-white"></div>
             </div>
 
             {/* Table Rows */}
-            {scores.map((score, index) => (
-              <div
-                key={score.id}
-                className={`flex py-1 hover:bg-[#000080] hover:text-white ${
-                  index < 3 ? "bg-[#FFFF00]" : ""
-                }`}
-              >
-                <div className="w-12">{index + 1}</div>
-                <div className="flex-1 truncate">{score.name}</div>
-                <div className="w-20 text-right">{score.score.toLocaleString()}</div>
-                {type !== "venice" && (
-                  <div className="w-20 text-right">
-                    {score.extra?.accuracy ? `${score.extra.accuracy.toFixed(1)}%` : "-"}
-                  </div>
-                )}
+            {scores.map((score, index) => {
+              const getRankStyle = (rank: number) => {
+                if (rank === 0) return {
+                  background: "linear-gradient(135deg, #FFF176 0%, #FFD700 50%, #FFC947 100%)"
+                }; // 금색 그라데이션 (중간)
+                if (rank === 1) return {
+                  background: "linear-gradient(135deg, #F5F5F5 0%, #EEEEEE 50%, #E0E0E0 100%)"
+                }; // 은색 그라데이션 (중간)
+                if (rank === 2) return {
+                  background: "linear-gradient(135deg, #FFCC80 0%, #FFB74D 50%, #FFA726 100%)"
+                }; // 동색 그라데이션 (중간)
+                return {};
+              };
 
-                {/* Mode-specific columns */}
-                {type === "short" && (
-                  <>
-                    <div className="w-20 text-right">
-                      {score.extra?.wpm ? score.extra.wpm.toFixed(0) : "-"}
-                    </div>
-                    <div className="w-20 text-right">
-                      {score.extra?.totalSentences || "-"}
-                    </div>
-                  </>
-                )}
+              const getRankDisplay = (rank: number) => {
+                if (rank === 0) return "🥇";
+                if (rank === 1) return "🥈";
+                if (rank === 2) return "🥉";
+                return `${rank + 1}`;
+              };
 
-                {type === "long" && (
-                  <>
+              return (
+                <div
+                  key={score.id}
+                  className={`flex items-center gap-2 px-1 text-black`}
+                  style={getRankStyle(index)}
+                >
+                  <div className="w-6 text-center">{getRankDisplay(index)}</div>
+                  <div className="flex-1 truncate">{score.name}</div>
+                  <div className="w-20 text-right">{score.score.toLocaleString()}</div>
+                  {type !== "venice" && (
+                    <div className="w-20 text-right">
+                      {score.extra?.accuracy ? `${score.extra.accuracy.toFixed(1)}%` : "-"}
+                    </div>
+                  )}
+
+                  {/* Mode-specific columns */}
+                  {type === "short" && (
+                    <>
+                      <div className="w-20 text-right">
+                        {score.extra?.wpm ? score.extra.wpm.toFixed(0) : "-"}
+                      </div>
+                      <div className="w-20 text-right">
+                        {score.extra?.totalSentences || "-"}
+                      </div>
+                    </>
+                  )}
+
+                  {type === "long" && (
+                    <>
+                      <div className="w-16 text-right">
+                        {score.extra?.grade || "-"}
+                      </div>
+                      <div className="w-20 text-right">
+                        {score.extra?.wpm ? score.extra.wpm.toFixed(0) : "-"}
+                      </div>
+                      <div className="w-20 text-right">
+                        {score.extra?.totalLines || "-"}
+                      </div>
+                    </>
+                  )}
+
+                  {type === "venice" && (
                     <div className="w-16 text-right">
-                      {score.extra?.grade || "-"}
+                      {score.extra?.level || "-"}
                     </div>
-                    <div className="w-20 text-right">
-                      {score.extra?.wpm ? score.extra.wpm.toFixed(0) : "-"}
-                    </div>
-                    <div className="w-20 text-right">
-                      {score.extra?.totalLines || "-"}
-                    </div>
-                  </>
-                )}
+                  )}
 
-                {type === "venice" && (
-                  <div className="w-16 text-right">
-                    {score.extra?.level || "-"}
-                  </div>
-                )}
-
-                <div className="w-20 text-right">{formatDate(score.created_at)}</div>
-              </div>
-            ))}
+                  <div className="w-20 text-right">{formatDate(score.created_at)}</div>
+                </div>
+              );
+            })}
           </div>
         )}
       </DosWindow>
