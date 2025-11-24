@@ -231,6 +231,12 @@ export default function VeniceGame() {
             livesRemaining: bricks,
           }),
         });
+
+        // 점수 제출 후 랭킹 업데이트
+        fetch('/api/ranking?type=venice')
+          .then(res => res.json())
+          .then(data => setVeniceRankings(data.rankings || []))
+          .catch(err => console.error('Failed to fetch rankings after submit:', err));
       } catch (err) {
         console.error("Failed to submit score:", err);
       }
@@ -316,7 +322,7 @@ export default function VeniceGame() {
 
   const spawnNewWord = () => {
     const randomWord = words[Math.floor(Math.random() * words.length)];
-    const isVirus = Math.random() < 0.15;
+    const isVirus = Math.random() < 0.075;
 
     // 단어 너비 계산
     const wordWidth = getWordWidth(randomWord);
