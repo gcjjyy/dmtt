@@ -3,6 +3,12 @@ import { useNavigate } from "react-router";
 import { useLanguage } from "~/contexts/LanguageContext";
 import { DosWindow } from "~/components/DosWindow";
 
+export function meta() {
+  return [
+    { title: "환영합니다 | 도·박타자교사" },
+  ];
+}
+
 export default function Welcome() {
   const { t } = useLanguage();
   const navigate = useNavigate();

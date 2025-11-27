@@ -5,6 +5,12 @@ import { useLanguage } from "~/contexts/LanguageContext";
 import { loadProverbs } from "~/lib/data-loader.server";
 import { calculateTypingStats, calculateCorrectKeystrokes } from "~/lib/typing-engine";
 
+export function meta() {
+  return [
+    { title: "단문 연습 | 도·박타자교사" },
+  ];
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const lang = (url.searchParams.get("lang") || "ko") as "ko" | "en";

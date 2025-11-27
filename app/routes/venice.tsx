@@ -6,6 +6,12 @@ import { useGameStatus } from "~/contexts/GameStatusContext";
 import { loadWords } from "~/lib/data-loader.server";
 import { DosWindow } from "~/components/DosWindow";
 
+export function meta() {
+  return [
+    { title: "베네치아 게임 | 도·박타자교사" },
+  ];
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const lang = (url.searchParams.get("lang") || "ko") as "ko" | "en";
@@ -1108,11 +1114,16 @@ export default function VeniceGame() {
                       return (
                         <>
                           {/* Header */}
-                          <div className="flex items-center gap-2 px-1 text-black border-b border-[#808080] pb-1 mb-1">
+                          <div className="flex items-center gap-2 px-1 text-black pb-0.5">
                             <div className="w-8">#</div>
                             <div className="flex-1">{t("이름", "Name")}</div>
                             <div className="w-12 text-right">{t("단계", "Stage")}</div>
                             <div className="w-24 text-right">{t("점수", "Score")}</div>
+                          </div>
+                          {/* Separator Line */}
+                          <div className="mb-1">
+                            <div className="border-b border-[#808080]"></div>
+                            <div className="border-b border-white"></div>
                           </div>
                           {/* Scores */}
                           <div className="space-y-0.5">
@@ -1133,8 +1144,13 @@ export default function VeniceGame() {
                             })}
                           </div>
 
+                          {/* Separator Line */}
+                          <div className="mt-2">
+                            <div className="border-b border-[#808080]"></div>
+                            <div className="border-b border-white"></div>
+                          </div>
                           {/* Buttons */}
-                          <div className="flex gap-2 mt-2 pt-2 border-t border-[#808080]">
+                          <div className="flex gap-2 pt-2">
                             <button
                               onClick={() => {
                                 // 게임 오버 상태 초기화

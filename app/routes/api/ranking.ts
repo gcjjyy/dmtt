@@ -20,13 +20,19 @@ export async function loader({ request }: Route.LoaderArgs) {
   const type = url.searchParams.get("type") || "venice";
 
   try {
-    const rankings = await sql<Score[]>`
+    const rawRankings = await sql<Score[]>`
       SELECT id, name, type, score, created_at, extra
       FROM scores
       WHERE type = ${type}
       ORDER BY score DESC
-      LIMIT 10
+      LIMIT 100
     `;
+
+    // Parse extra field if it's a string
+    const rankings = rawRankings.map(ranking => ({
+      ...ranking,
+      extra: typeof ranking.extra === 'string' ? JSON.parse(ranking.extra) : ranking.extra
+    }));
 
     return { rankings };
   } catch (error) {

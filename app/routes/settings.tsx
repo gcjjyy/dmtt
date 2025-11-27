@@ -2,6 +2,12 @@ import { useState, useEffect } from "react";
 import { useLanguage, type Language } from "~/contexts/LanguageContext";
 import { DosWindow } from "~/components/DosWindow";
 
+export function meta() {
+  return [
+    { title: "설정 | 도·박타자교사" },
+  ];
+}
+
 export default function Settings() {
   const { language, setLanguage, t } = useLanguage();
 

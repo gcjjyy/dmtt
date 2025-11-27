@@ -11,6 +11,12 @@ import {
   type TypingStats,
 } from "~/lib/typing-engine";
 
+export function meta() {
+  return [
+    { title: "장문 연습 | 도·박타자교사" },
+  ];
+}
+
 export async function loader({ params, request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const lang = (url.searchParams.get("lang") || "ko") as "ko" | "en";

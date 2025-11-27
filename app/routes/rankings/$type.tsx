@@ -4,6 +4,12 @@ import { useLanguage } from "~/contexts/LanguageContext";
 import { sql } from "~/lib/db.server";
 import { DosWindow } from "~/components/DosWindow";
 
+export function meta() {
+  return [
+    { title: "랭킹 | 도·박타자교사" },
+  ];
+}
+
 interface Score {
   id: number;
   name: string;

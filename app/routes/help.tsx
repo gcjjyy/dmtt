@@ -2,6 +2,12 @@ import { useState } from "react";
 import { useLanguage } from "~/contexts/LanguageContext";
 import { DosWindow } from "~/components/DosWindow";
 
+export function meta() {
+  return [
+    { title: "도움말 | 도·박타자교사" },
+  ];
+}
+
 type Topic = "short" | "long" | "venice" | "rankings" | "settings" | "credits";
 
 export default function Help() {
