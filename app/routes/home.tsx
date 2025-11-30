@@ -119,7 +119,7 @@ export default function Home() {
             <DosWindow
               key={type.key}
               title={type.title}
-              className="h-[380px]"
+              className="h-[380px] w-full"
             >
               <div className="px-2 py-1.5 flex flex-col h-full">
                 {scores.length === 0 ? (
