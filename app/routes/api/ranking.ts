@@ -19,11 +19,18 @@ export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const type = url.searchParams.get("type") || "venice";
 
+  // Get current year and month for filtering
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
   try {
     const rawRankings = await sql<Score[]>`
       SELECT id, name, type, score, created_at, extra
       FROM scores
       WHERE type = ${type}
+        AND EXTRACT(YEAR FROM created_at) = ${currentYear}
+        AND EXTRACT(MONTH FROM created_at) = ${currentMonth}
       ORDER BY score DESC
       LIMIT 100
     `;
