@@ -33,28 +33,37 @@ DATABASE_URL=postgresql://user:password@localhost:5432/dmtt
 ### 데이터베이스 설정
 
 ```sql
--- scores 테이블 생성
+-- scores 테이블 생성 (월별 랭킹 지원)
 CREATE TABLE scores (
   id SERIAL PRIMARY KEY,
-  name VARCHAR(50),
-  type VARCHAR(20),  -- 'short', 'long', 'venice'
-  score INT,
-  extra JSONB,       -- {accuracy, cpm, sentence?}
-  created_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(name, type)
+  name TEXT NOT NULL,
+  type TEXT NOT NULL,  -- 'short', 'long', 'venice'
+  score INT NOT NULL,
+  extra JSONB,         -- {accuracy, cpm, level, ...}
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  year INT NOT NULL,   -- 기록 년도
+  month INT NOT NULL,  -- 기록 월
+  UNIQUE(name, type, year, month)
 );
 
--- upsert 함수 생성 (새 점수가 더 높을 때만 업데이트)
+-- 인덱스 생성
+CREATE INDEX idx_scores_type_score_desc ON scores (type, score DESC);
+CREATE INDEX idx_scores_year_month ON scores (year, month);
+
+-- upsert 함수 (현재 월 기준, 새 점수가 더 높을 때만 업데이트)
 CREATE OR REPLACE FUNCTION upsert_score(
-  p_name VARCHAR(50),
-  p_type VARCHAR(20),
+  p_name TEXT,
+  p_type TEXT,
   p_score INT,
   p_extra JSONB
 ) RETURNS VOID AS $$
+DECLARE
+  v_year INTEGER := EXTRACT(YEAR FROM NOW())::INTEGER;
+  v_month INTEGER := EXTRACT(MONTH FROM NOW())::INTEGER;
 BEGIN
-  INSERT INTO scores (name, type, score, extra, created_at)
-  VALUES (p_name, p_type, p_score, p_extra, NOW())
-  ON CONFLICT (name, type)
+  INSERT INTO scores (name, type, score, extra, created_at, year, month)
+  VALUES (p_name, p_type, p_score, p_extra, NOW(), v_year, v_month)
+  ON CONFLICT (name, type, year, month)
   DO UPDATE SET
     score = EXCLUDED.score,
     extra = EXCLUDED.extra,
@@ -63,6 +72,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 ```
+
+> **기존 DB 마이그레이션**: `migrations/001_add_year_month.sql` 파일을 실행하세요.
 
 ### 설치
 
