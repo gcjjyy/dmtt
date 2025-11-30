@@ -19,11 +19,18 @@ interface Score {
 
 export async function loader() {
   try {
-    // Fetch top 10 scores for each type
+    // Get current year and month for filtering
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+
+    // Fetch top 10 scores for each type (current month only)
     const rawShortScores = await sql<Score[]>`
       SELECT id, name, type, score, created_at, extra
       FROM scores
       WHERE type = 'short'
+        AND EXTRACT(YEAR FROM created_at) = ${currentYear}
+        AND EXTRACT(MONTH FROM created_at) = ${currentMonth}
       ORDER BY score DESC
       LIMIT 10
     `;
@@ -32,6 +39,8 @@ export async function loader() {
       SELECT id, name, type, score, created_at, extra
       FROM scores
       WHERE type = 'long'
+        AND EXTRACT(YEAR FROM created_at) = ${currentYear}
+        AND EXTRACT(MONTH FROM created_at) = ${currentMonth}
       ORDER BY score DESC
       LIMIT 10
     `;
@@ -40,6 +49,8 @@ export async function loader() {
       SELECT id, name, type, score, created_at, extra
       FROM scores
       WHERE type = 'venice'
+        AND EXTRACT(YEAR FROM created_at) = ${currentYear}
+        AND EXTRACT(MONTH FROM created_at) = ${currentMonth}
       ORDER BY score DESC
       LIMIT 10
     `;
