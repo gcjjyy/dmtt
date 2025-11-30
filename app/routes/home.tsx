@@ -110,7 +110,7 @@ export default function Home() {
         {t(`이번 달(${monthNames.ko[currentMonth - 1]}) 랭킹`, `This Month (${monthNames.en[currentMonth - 1]}) Rankings`)}
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-4 w-full">
         {rankingTypes.map((type) => {
           const typeKey = type.key as "short" | "long" | "venice";
           const scores = rankings[typeKey];
