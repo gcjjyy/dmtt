@@ -270,8 +270,10 @@ export default function LongPracticeTyping() {
     return (
       <div key={lineIndex} data-line={lineIndex} className="mb-4">
         {/* 원문 */}
-        <div className="leading-4 mb-0 text-black">
-          {line}
+        <div className="leading-4 mb-0 text-black whitespace-pre">
+          {line.split("").map((char, charIdx) => (
+            <span key={charIdx}>{char === " " ? "\u00A0" : char}</span>
+          ))}
         </div>
         {/* 입력한 텍스트 (항상 표시, 이전 줄들만 내용 있음) */}
         <div className="leading-4 mb-0 h-4 flex items-center">
@@ -385,8 +387,10 @@ export default function LongPracticeTyping() {
 
                 {/* 현재 줄 */}
                 <div className="mb-4" data-line={currentLineIndex}>
-                  <div className="leading-4 mb-0 text-black">
-                    {currentLine}
+                  <div className="leading-4 mb-0 text-black whitespace-pre">
+                    {currentLine.split("").map((char, i) => (
+                      <span key={i}>{char === " " ? "\u00A0" : char}</span>
+                    ))}
                   </div>
                   {/* 입력 표시 */}
                   <div className="leading-4 mb-0 h-4 flex items-center">

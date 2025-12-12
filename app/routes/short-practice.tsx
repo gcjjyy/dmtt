@@ -194,8 +194,10 @@ export default function ShortPractice() {
             {/* Sentence Area */}
             <div className="flex-1 flex flex-col justify-center px-6 py-4">
               {/* Original Text */}
-              <div className="text-black mb-1">
-                {currentProverb}
+              <div className="text-black mb-1 whitespace-pre">
+                {currentProverb.split("").map((char, i) => (
+                  <span key={i}>{char === " " ? "\u00A0" : char}</span>
+                ))}
               </div>
 
               {/* Typed Text / Cursor */}
