@@ -296,12 +296,7 @@ export default function VeniceGame() {
         fallCountRef.current = 4;
         setInputBoxFallCount(4);
 
-        // 랭킹 데이터 fetch
-        fetch('/api/ranking?type=venice')
-          .then(res => res.json())
-          .then(data => setVeniceRankings(data.rankings || []))
-          .catch(err => console.error('Failed to fetch rankings:', err));
-
+        // 랭킹은 submitScore에서 점수 제출 후 fetch
         setGameOver(true);
       }, 2625);
 
